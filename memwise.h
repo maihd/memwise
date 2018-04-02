@@ -2,10 +2,9 @@
 #define __MEMWISE_H__
 
 
-#ifndef MEMWISE_NOSTD
-# include <assert.h>
-# include <stdlib.h>
-#endif
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define __MCONCAT(x, y) x ## y
 #define _MCONCAT(x, y) __MCONCAT(x, y)
@@ -15,13 +14,13 @@
 #define MEMWISE_ERROR_EMPTY  1
 #define MEMWISE_ERROR_MEMORY 2
 
-#define MEMWISE_ERROR(func, code)  func ": " VLIB_ERROR_STRING(code)
-#define MEMWISE_ERROR_STRING(code) _MCONCAT(VLIB_ERROR_STRING, code)
+#define MEMWISE_ERROR(func, code)  func ": " MEMWISE_ERROR_STRING(code)
+#define MEMWISE_ERROR_STRING(code) _MCONCAT(MEMWISE_ERROR_STRING, code)
 #define MEMWISE_ERROR_STRING0      "Index out of range"
 #define MEMWISE_ERROR_STRING1      "No elements"
 #define MEMWISE_ERROR_STRING2      "Out of memory"
 
-#define MEMWISE_ASSERT(exp, f, e)  assert(exp, MEMWISE_ERROR(f, e))
+#define MEMWISE_ASSERT(exp, f, e)  assert(exp && MEMWISE_ERROR(f, e))
 
 /* ----------------- MEMORY BUFFER ----------------- */
 /**
@@ -35,7 +34,7 @@ typedef struct
 } membuf_t;
 
 #define membuf_collect(buf, ptr)  (buf)->collect((buf)->data, ptr)
-#define membuf_extract(buf, s, a) (buf)->extract((buf)->data, s, a)
+#define membuf_extract(buf, size) (buf)->extract((buf)->data, size, 1)
 
 /* ----------------- CONTAINERS -------------------- */
 #if MEMWISE_C_VERSION || !defined(__cplusplus)
@@ -137,12 +136,14 @@ typedef struct
 /**************************
  * Array
  **************************/
-#define ARRAY_FIELDS(type_t) uint_t count, capacity; type_t* elements
+#define ARRAY_FIELDS(type_t)				\
+    int count, capacity; type_t* elements; membuf_t* membuffer
+
 #define array_t(type_t)      struct { ARRAY_FIELDS(type_t); }
-#define array_init(a, c, m)						\
+#define array_init(a, m)						\
     do {								\
 	(a).count     = 0;						\
-	(a).capacity  = c;						\
+	(a).capacity  = 0;						\
 	(a).elements  = 0;						\
 	(a).membuffer = m;						\
     } while (0)
@@ -150,14 +151,14 @@ typedef struct
 #define array_free(a)							\
     do {								\
 	membuf_collect((a).membuffer, (a).elements);			\
-	(a).count    = 0;						\
-	(a).capacity = 0;						\
-	(a).elements = 0;						\
+	(a).count     = 0;						\
+	(a).capacity  = 0;						\
+	(a).elements  = 0;						\
     } while (0)
 
 #define array_set(a, i, e)						\
     do {								\
-	MEMWISE_ASSERT(i > -1, "array_set", MEMWISE_ERROR_MEMORY);	\
+	MEMWISE_ASSERT(i > -1, "array_set", MEMWISE_ERROR_INDEX);	\
 	if (i >= (a).count) (a).count = i + 1;				\
 	if ((a).count > (a).capacity)					\
 	{								\
@@ -181,16 +182,24 @@ typedef struct
 
 #define array_push(a, e)						\
     do {								\
-	uint_t _GENSYM(__i) = (a).count;				\
-	array_set(a, VLIB_GENSYM(__i), e);				\
+	int _MGENSYM(_i_) = (a).count;					\
+	array_set(a, _MGENSYM(_i_), e);					\
     } while (0)
 
 #define array_ensure(a) if ((a).count < (a).capacity) array_expand(a)
 
 #define array_expand(a)							\
-    ((a).elements = vlib__realloc((a).elements,				\
-				  ((a).capacity *= 2)			\
-				  * sizeof((a).elements[0])))
+      do {								\
+	  int capacity;							\
+	  if ((capacity = (a).capacity * 2) <= 0) capacity = 64;	\
+	  int   size    = ((a).capacity * sizeof((a).elements[0]));	\
+	  int   new_size     = (capacity * sizeof((a).elements[0]));	\
+	  void* new_elements = membuf_extract((a).membuffer, new_size); \
+	  memcpy(new_elements, (a).elements, size);			\
+	  membuf_collect((a).membuffer, (a).elements);			\
+	  (a).capacity = capacity;					\
+	  (a).elements = new_elements;					\
+      } while (0)
 
 #define array_erase(a, i)						\
     do {								\
@@ -210,12 +219,12 @@ typedef struct
 
 #define array__foreach(a, type_t, v, i, n, arr)				\
     type_t v; type_t* arr = (a).elements;				\
-    int i = 0; uint_t n = (a).count;					\
-    for (v = arr[i]; i < n; v = arr[++i]) 
+    int i = 0; int n = (a).count;					\
+    if (n > 0) v = arr[0];						\
+    for (; i < n; v = arr[++i]) 
 
-#define array_foreach(a, type_t, v)				\
-    array__foreach(a, type_t, v,				\
-		   _MGENSYM(__i_),				\
+#define array_foreach(a, type_t, i, v)				\
+    array__foreach(a, type_t, v, i,				\
 		   _MGENSYM(__n_),				\
 		   _MGENSYM(__a_))
 
@@ -467,9 +476,5 @@ struct queue_t
 
 /* END OF C++ VERSIONS */
 #endif
-
-#undef __MCONCAT
-#undef _MCONCAT
-#undef _MGENSYM
 
 #endif /* __CONTAINERS_H__ */
