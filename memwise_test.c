@@ -33,7 +33,7 @@ void intarr_set(intarr_t* arr, int idx, int value)
 
 void intarr_push(intarr_t* arr, int value)
 {
-    intarr_set(arr, arr->count, value);
+    array_push(*arr, value);
 }
 
 int intarr_pop(intarr_t* arr)
@@ -43,6 +43,8 @@ int intarr_pop(intarr_t* arr)
 
 int main(int argc, char* argv[])
 {
+    printf("Memwise unit test\n");
+    
     membuf_t membuf_default;
     membuf_default.data = NULL;
     membuf_default.collect = membuf_default_collect;
@@ -68,6 +70,5 @@ int main(int argc, char* argv[])
     
     intarr_free(&arr);
     
-    printf("Memwise unit test\n");
     return 0;
 }

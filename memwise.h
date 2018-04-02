@@ -22,7 +22,10 @@
 
 #define MEMWISE_ASSERT(exp, f, e)  assert(exp && MEMWISE_ERROR(f, e))
 
+/* ------------------------------------------------- */
 /* ----------------- MEMORY BUFFER ----------------- */
+/* ------------------------------------------------- */
+    
 /**
  * Memory buffer
  */
@@ -36,7 +39,9 @@ typedef struct
 #define membuf_collect(buf, ptr)  (buf)->collect((buf)->data, ptr)
 #define membuf_extract(buf, size) (buf)->extract((buf)->data, size, 1)
 
-/* ----------------- CONTAINERS -------------------- */
+/* --------------------------------------------------- */
+/* ------------------- CONTAINERS -------------------- */
+/* --------------------------------------------------- */
 #if MEMWISE_C_VERSION || !defined(__cplusplus)
 /* BEGIN OF C VERSIONS */
 
@@ -139,7 +144,17 @@ typedef struct
 #define ARRAY_FIELDS(type_t)				\
     int count, capacity; type_t* elements; membuf_t* membuffer
 
+/**
+ * Dynamic array container structure
+ */
 #define array_t(type_t)      struct { ARRAY_FIELDS(type_t); }
+
+/**
+ * Initialize array
+ *
+ * @param a - The array
+ * @param m - The memory buffer for elements space
+ */
 #define array_init(a, m)						\
     do {								\
 	(a).count     = 0;						\
@@ -148,6 +163,11 @@ typedef struct
 	(a).membuffer = m;						\
     } while (0)
 
+/**
+ * Return all memory usage of the array to its own memory buffer
+ *
+ * @param a - The array
+ */
 #define array_free(a)							\
     do {								\
 	membuf_collect((a).membuffer, (a).elements);			\
@@ -156,23 +176,27 @@ typedef struct
 	(a).elements  = 0;						\
     } while (0)
 
-#define array_set(a, i, e)						\
+/**
+ * Set array element's value at given index
+ *
+ * @param a - The array
+ * @param i - The index
+ * @param v - The value
+ */
+#define array_set(a, i, v)						\
     do {								\
 	MEMWISE_ASSERT(i > -1, "array_set", MEMWISE_ERROR_INDEX);	\
 	if (i >= (a).count) (a).count = i + 1;				\
-	if ((a).count > (a).capacity)					\
-	{								\
-	    array_expand(a);						\
-	}								\
-	(a).elements[i] = e;						\
+        array_ensure(a, (a).count);					\
+	(a).elements[i] = v;						\
     } while (0)
 
 #define array_ref(a, i)							\
     (MEMWISE_ASSERT(i > -1, "array_ref", MEMWISE_ERROR_INDEX),		\
      (a).elements + i)
 
-#define array_get(a, i)					\
-    (MEMWISE_ASSERT(i > -1 && i < (a).count,		\
+#define array_get(a, i)							\
+    (MEMWISE_ASSERT(i > -1 && i < (a).count,				\
 		    "array_get", MEMWISE_ERROR_INDEX),			\
      (a).elements[i])
 
@@ -186,25 +210,45 @@ typedef struct
 	array_set(a, _MGENSYM(_i_), e);					\
     } while (0)
 
-#define array_ensure(a) if ((a).count < (a).capacity) array_expand(a)
+/**
+ * Ensure the array that has enough space to contain 'c' elements
+ *
+ * @param a - The array
+ * @param c - The expected capacity
+ */
+#define array_ensure(a, c) if (c > (a).capacity) array_expand(a, c)
 
-#define array_expand(a)							\
+/**
+ * Expand the array that make enough space to contain 'c' elements
+ * 
+ * @param a - The array
+ * @param c - Minimal capacity
+ */
+#define array_expand(a, c)						\
       do {								\
-	  int capacity;							\
-	  if ((capacity = (a).capacity * 2) <= 0) capacity = 64;	\
+	  /* New container capacity */					\
+	  int capacity = (a).capacity;					\
+	  if (capacity <= 0)   capacity = 64;				\
+	  while (capacity < c) capacity *= 2;				\
+									\
+	  /* Elements container sizes and buffer */			\
 	  int   size    = ((a).capacity * sizeof((a).elements[0]));	\
 	  int   new_size     = (capacity * sizeof((a).elements[0]));	\
 	  void* new_elements = membuf_extract((a).membuffer, new_size); \
+									\
+	  /* Moving data and return memory to membuffer */		\
 	  memcpy(new_elements, (a).elements, size);			\
 	  membuf_collect((a).membuffer, (a).elements);			\
+									\
+	  /* Storing new variables */					\
 	  (a).capacity = capacity;					\
 	  (a).elements = new_elements;					\
       } while (0)
 
 #define array_erase(a, i)						\
     do {								\
-	vlib__assert(i > -1 && i < (a).count,				\
-		     "array_erase", MEMWISE_ERROR_INDEX);		\
+	MEMWISE_ASSERT(i > -1 && i < (a).count,				\
+		       "array_erase", MEMWISE_ERROR_INDEX);		\
 	int _k_; uint_t _n_ = (a).count;				\
 	for (_k_ = i; _k_ < _n_; _k_++)					\
 	    (a).elements[_k_] = (a).elements[_k_ + 1];			\
@@ -221,7 +265,7 @@ typedef struct
     type_t v; type_t* arr = (a).elements;				\
     int i = 0; int n = (a).count;					\
     if (n > 0) v = arr[0];						\
-    for (; i < n; v = arr[++i]) 
+    for (/* empty */; i < n; v = arr[++i]) 
 
 #define array_foreach(a, type_t, i, v)				\
     array__foreach(a, type_t, v, i,				\
