@@ -139,7 +139,7 @@ typedef struct
 
 
 /**************************
- * Array
+ * Dynamic size array
  **************************/
 #define ARRAY_FIELDS(type_t)				\
     int count, capacity; type_t* elements; membuf_t* membuffer
@@ -171,6 +171,7 @@ typedef struct
 #define array_free(a)							\
     do {								\
 	membuf_collect((a).membuffer, (a).elements);			\
+									\
 	(a).count     = 0;						\
 	(a).capacity  = 0;						\
 	(a).elements  = 0;						\
@@ -185,30 +186,56 @@ typedef struct
  */
 #define array_set(a, i, v)						\
     do {								\
-	MEMWISE_ASSERT(i > -1, "array_set", MEMWISE_ERROR_INDEX);	\
-	if (i >= (a).count) (a).count = i + 1;				\
+	int _i_ = i;							\
+									\
+	MEMWISE_ASSERT(_i_ > -1, "array_set", MEMWISE_ERROR_INDEX);	\
+									\
+	if (_i_ >= (a).count) (a).count = _i_ + 1;			\
         array_ensure(a, (a).count);					\
-	(a).elements[i] = v;						\
+	(a).elements[_i_] = v;						\
     } while (0)
 
+/**
+ * Get the pointer reference to element's slot at given index
+ *
+ * @param a - The array
+ * @param i - The index
+ * @return pointer to the element
+ */
 #define array_ref(a, i)							\
-    (MEMWISE_ASSERT(i > -1, "array_ref", MEMWISE_ERROR_INDEX),		\
+    (MEMWISE_ASSERT((i) > -1, "array_ref", MEMWISE_ERROR_INDEX),	\
      (a).elements + i)
 
+/**
+ * Get the element's value at given index
+ *
+ * @param a - The array
+ * @param i - The index
+ * @return The element's value
+ */
 #define array_get(a, i)							\
-    (MEMWISE_ASSERT(i > -1 && i < (a).count,				\
+    (MEMWISE_ASSERT((i) > -1 && (i) < (a).count,			\
 		    "array_get", MEMWISE_ERROR_INDEX),			\
      (a).elements[i])
 
+/**
+ * Remove the last element and return its value, 
+ * abort() when array is empty
+ *
+ * @param a - The array
+ * @return The last element's value
+ */
 #define array_pop(a)							\
     (MEMWISE_ASSERT((a).count > 0, "array_pop", MEMWISE_ERROR_EMPTY),	\
      (a).elements[--(a).count])
 
-#define array_push(a, e)						\
-    do {								\
-	int _MGENSYM(_i_) = (a).count;					\
-	array_set(a, _MGENSYM(_i_), e);					\
-    } while (0)
+/**
+ * Create new element at the last position with given value
+ * 
+ * @param a - The array
+ * @param v - The value
+ */
+#define array_push(a, v) array_set(a, (a).count, v)
 
 /**
  * Ensure the array that has enough space to contain 'c' elements
@@ -216,7 +243,12 @@ typedef struct
  * @param a - The array
  * @param c - The expected capacity
  */
-#define array_ensure(a, c) if (c > (a).capacity) array_expand(a, c)
+#define array_ensure(a, c)				\
+    do {						\
+	int _c_ = c;					\
+							\
+	if (_c_ > (a).capacity) array_expand(a, _c_);	\
+    } while (0)
 
 /**
  * Expand the array that make enough space to contain 'c' elements
@@ -227,13 +259,13 @@ typedef struct
 #define array_expand(a, c)						\
       do {								\
 	  /* New container capacity */					\
-	  int capacity = (a).capacity;					\
-	  if (capacity <= 0)   capacity = 64;				\
-	  while (capacity < c) capacity *= 2;				\
+	  int _c1_ = (a).capacity; /* Add number to avoid with _c_ */	\
+	  if (_c1_ <= 0)   _c1_ = 64;					\
+	  while (_c1_ < c) _c1_ *= 2;					\
 									\
 	  /* Elements container sizes and buffer */			\
 	  int   size    = ((a).capacity * sizeof((a).elements[0]));	\
-	  int   new_size     = (capacity * sizeof((a).elements[0]));	\
+	  int   new_size     = (_c1_ * sizeof((a).elements[0]));	\
 	  void* new_elements = membuf_extract((a).membuffer, new_size); \
 									\
 	  /* Moving data and return memory to membuffer */		\
@@ -241,25 +273,122 @@ typedef struct
 	  membuf_collect((a).membuffer, (a).elements);			\
 									\
 	  /* Storing new variables */					\
-	  (a).capacity = capacity;					\
+	  (a).capacity = _c1_;						\
 	  (a).elements = new_elements;					\
       } while (0)
 
-#define array_erase(a, i)						\
-    do {								\
-	MEMWISE_ASSERT(i > -1 && i < (a).count,				\
-		       "array_erase", MEMWISE_ERROR_INDEX);		\
-	int _k_; uint_t _n_ = (a).count;				\
-	for (_k_ = i; _k_ < _n_; _k_++)					\
-	    (a).elements[_k_] = (a).elements[_k_ + 1];			\
+/**
+ * Find the element has the given value, with specified compare expression
+ * 
+ * @param a   - The array
+ * @param v   - The value
+ * @param out - The variable that receive output
+ * @param cmp - Compare expression
+ */
+#define array_find_cmp(a, v, out, cmp)		\
+    do {					\
+	out = -1;				\
+						\
+	int _i2_; int _n2_ = (a).count;		\
+	for (_i2_ = 0; _i2_ < _n2_; _i2_++)	\
+	{					\
+	    if (cmp((a).elements[_i2_], v))	\
+	    {					\
+		out = _i2_;			\
+		break;				\
+	    }					\
+	}					\
     } while (0)
 
-#define array_remove(a, e)						\
-    do {								\
-	int _j_; uint_t _n_ = (a).count;				\
-	for (_j_ = 0; _j_ < _n_; _j_++)					\
-	    if ((a).elements[_j_] == e)	array_erase(_i_);		\
+/**
+ * Find the element has the given value in reverse order
+ * 
+ * @param a   - The array
+ * @param v   - The value
+ * @param out - The variable that receive output
+ */
+#define array_find(a, v, out) array_find_cmp(a, v, out, MEMWISE_DEFCMP)
+
+/**
+ * Find the element has the given value in reverse order,
+ * with specified compare expression
+ * 
+ * @param a   - The array
+ * @param v   - The value
+ * @param out - The variable that receive output
+ * @param cmp - Compare expression
+ */
+#define array_rfind_cmp(a, v, out, cmp)			\
+    do {						\
+	out = -1;					\
+							\
+	int _i2_;					\
+	for (_i2_ = (a).count; _i2_ > -1; _i2_--)	\
+	{						\
+	    if (cmp((a).elements[_i2_], v))		\
+	    {						\
+		out = _i2_;				\
+		break;					\
+	    }						\
+	}						\
     } while (0)
+
+/**
+ * Find the element has the given value in reverse order
+ * 
+ * @param a   - The array
+ * @param v   - The value
+ * @param out - The variable that receive output
+ */
+#define array_rfind(a, v, out) array_find_cmp(a, v, out, MEMWISE_DEFCMP)
+
+/**
+ * Erase the element at given the position
+ *
+ * @param a - The array
+ * @param i - The index of the element position
+ */
+#define array_erase(a, i)						\
+    do {								\
+	int _i1_ = i;							\
+									\
+	MEMWISE_ASSERT(_i1_ > -1 && _i1_ < (a).count,			\
+		       "array_erase", MEMWISE_ERROR_INDEX);		\
+									\
+	void* _dst_ = &(a).elements[_i1_];				\
+	void* _src_ = &(a).elements[_i1_ + 1];				\
+	int   _sze_ = ((a).count - _i1_ - 1) * sizeof((a).elements[0]);	\
+	memcpy(_dst_, _src_, _sze_);					\
+	(a).count -= 1;							\
+    } while (0)
+
+/**
+ * Remove the element that fit the requirement
+ * 
+ * @param a   - The array
+ * @param v   - The value
+ * @param cmp - Compare expression (macros or function)
+ */
+#define array_remove_cmp(a, v, cmp)					\
+    do {								\
+	int _j_; int _n_ = (a).count;					\
+	for (_j_ = 0; _j_ < _n_; _j_++)					\
+	{								\
+	    if (cmp((a).elements[_j_], v))				\
+	    {								\
+		array_erase(_j_);					\
+		break;							\
+	    }								\
+	}								\
+    } while (0)
+
+/**
+ * Remove the element that has given value
+ *
+ * @param a - The array
+ * @param v - The value
+ */
+#define array_remove(a, v) array_remove_cmp(a, v, MEMWISE_DEFCMP)
 
 #define array__foreach(a, type_t, v, i, n, arr)				\
     type_t v; type_t* arr = (a).elements;				\
@@ -267,6 +396,14 @@ typedef struct
     if (n > 0) v = arr[0];						\
     for (/* empty */; i < n; v = arr[++i]) 
 
+/**
+ * Loop through the array 
+ *
+ * @param a      - The array
+ * @param type_t - The type of value
+ * @param i      - The index variable name
+ * @param v      - The value variable name
+ */
 #define array_foreach(a, type_t, i, v)				\
     array__foreach(a, type_t, v, i,				\
 		   _MGENSYM(__n_),				\
