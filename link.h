@@ -36,6 +36,9 @@ typedef struct link_s
     struct link_s* prev, next;
 } link_t;
 
+/**
+ * Attach lnk to tgt->next
+ */
 #define link_append(lnk, tgt)			\
     do {					\
 	(lnk)->prev = (tgt);			\
@@ -43,6 +46,9 @@ typedef struct link_s
 	(tgt)->next = (lnk);			\
     } while (0)
 
+/**
+ * Attach lnk to tgt->prev
+ */
 #define link_before(lnk, pos)			\
     do {					\
 	(lnk)->prev = (tgt)->prev;		\
@@ -50,6 +56,20 @@ typedef struct link_s
 	(tgt)->prev = (lnk);			\
     } while (0)
 
+/**
+ * Detach the link from the chains
+ */
+#define link_detach(lnk)					\
+    do {							\
+	if ((lnk)->prev) (lnk)->prev->next = (lnk)->next;	\
+	if ((lnk)->next) (lnk)->next->prev = (lnk)->prev;	\
+	(lnk)->prev = NULL;					\
+	(lnk)->next = NULL;					\
+    } while (0)
+
+/**
+ * Get parent container of link
+ */
 #define link_parent(lnk, type_t, member)			\
     ((type_t*)((char*)lnk + (int)&((type_t*)0)->member))
 

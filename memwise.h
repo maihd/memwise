@@ -25,7 +25,9 @@
 /* ------------------------------------------------- */
 /* ----------------- MEMORY BUFFER ----------------- */
 /* ------------------------------------------------- */
-    
+
+#ifndef HAS_MEMBUF_T
+#define HAS_MEMBUF_T
 /**
  * Memory buffer
  */
@@ -38,6 +40,7 @@ typedef struct
 
 #define membuf_collect(buf, ptr)  (buf)->collect((buf)->data, ptr)
 #define membuf_extract(buf, size) (buf)->extract((buf)->data, size, 1)
+#endif
 
 /* --------------------------------------------------- */
 /* ------------------- CONTAINERS -------------------- */
