@@ -10,6 +10,12 @@
 #define _MCONCAT(x, y) __MCONCAT(x, y)
 #define _MGENSYM(x)    _MCONCAT(x, __LINE__)
 
+#if defined(__cplusplus)
+#define _MPTR_ASSIGN(a, b) ((a) = (decltype(a))(b))
+#else
+#define _MPTR_ASSIGN(a, b) ((a) = (b))
+#endif
+
 #define MEMWISE_ERROR_INDEX  0
 #define MEMWISE_ERROR_EMPTY  1
 #define MEMWISE_ERROR_MEMORY 2
@@ -45,112 +51,138 @@ typedef struct
 /* --------------------------------------------------- */
 /* ------------------- CONTAINERS -------------------- */
 /* --------------------------------------------------- */
-#if MEMWISE_C_VERSION || !defined(__cplusplus)
-/* BEGIN OF C VERSIONS */
 
 #define MEMWISE_DEFCMP(a, b) ((a) == (b))
 
 /**************************
  * Temporary array
  **************************/
-#define TEMPO_FIELDS(type_t, c) int count; type_t elements[c]
-#define tempo_t(type_t, c)      struct { TEMPO_FIELDS(type_t, c); }
-#define tempo_init(t) do { (t).count = 0; } while (0)
-#define tempo_count(t)    (t).count
-#define tempo_capacity(t) (sizeof((t).elements) / sizeof((t).elements[0]))
-#define tempo_elements(t) (t).elements
-#define tempo_set(t, i, e)						\
+#define memwise__tempo_t(type_t, c) \
+    int    count;		    \
+    type_t elements[c]	    
+
+#define memwise__tempo_init(t)      \
+    do { (t).count = 0; } while (0)
+
+#define memwise__tempo_capacity(t)			\
+    (sizeof((t).elements) / sizeof((t).elements[0]))
+
+#define memwise__tempo_set(t, i, e)					\
     do {								\
 	if (i <= (t).count) {						\
 	    (t).count = i + 1;						\
-	    MEMWISE_ASSERT((t).count <= tempo_capacity(t),		\
+	    MEMWISE_ASSERT((t).count <= memwise__tempo_capacity(t),	\
 			   "tempo_set", MEMWISE_ERROR_MEMORY);		\
 	}								\
 	(t).elements[i] = e;						\
     } while (0)
 
-#define tempo_get(t, i)							\
+#define memwise__tempo_get(t, i)					\
     (MEMWISE_ASSERT(i > -1 && i < (t).count,				\
-		    "tempo_get", MEMWISE_ERROR_INDEX),			\
+		    "tempo_get",					\
+		    MEMWISE_ERROR_INDEX),				\
      (t).elements[i])
 
-#define tempo_ref(t, i)							\
-    (MEMWISE_ASSERT(i > -1 && i < tempo_capacity(t),			\
-		    "tempo_ref", MEMWISE_ERROR_INDEX),		\
+#define memwise__tempo_ref(t, i)					\
+    (MEMWISE_ASSERT(i > -1 && i < memwise__tempo_capacity(t),		\
+		    "tempo_ref",					\
+		    MEMWISE_ERROR_INDEX),				\
      (t).elements + i)
 
-#define tempo_pop(t)							\
+#define memwise__tempo_pop(t)						\
     (MEMWISE_ASSERT((t).count > 0,					\
-		    "tempo_pop", MEMWISE_ERROR_COUNT),		\
+		    "tempo_pop",					\
+		    MEMWISE_ERROR_EMPTY),				\
      (t).elements[--(t).count])
 
-#define tempo_push(t, e)					\
-    do {							\
-	int _i_ = (t).count;					\
-	tempo_set(t, _i_, e);					\
+#define memwise__tempo_push(t, e)					\
+    do {								\
+	int _i_ = (t).count;						\
+	tempo_set(t, _i_, e);						\
     } while (0)
 
-#define tempo_find(t, e, i) tempo_find_cmp(t, e, i, MEMWISE_DEFCMP)
-#define tempo_find_cmp(t, e, i, cmp)			\
+#define memwise__tempo_find(t, e, i)			\
+    memwise__tempo_find_cmp(t, e, i, MEMWISE_DEFCMP)
+
+#define memwise__tempo_find_cmp(t, e, i, cmp)		\
     do {						\
-	int _j_; uint_t _m_ = (t).count;		\
-	for (_j_ = 0; _j_ < _m_; _j_++)			\
+	int _j_; int _m_ = (t).count;			\
+	for (_j_ = 0; _j_ < _m_; _j_++)	{		\
 	    if (cmp(e, (t).elements[_j_])) {		\
 	        (i) = _j_; break;			\
 	    }						\
+	}						\
     } while (0)
 
-#define tempo_erase(t, i)						\
+#define memwise__tempo_rfind(t, e, i)			\
+    memwise__tempo_rfind_cmp(t, e, i, MEMWISE_DEFCMP)
+
+#define memwise__tempo_rfind_cmp(t, e, i, cmp)		\
+    do {						\
+	int _j_; int _m_ = (t).count;			\
+	for (_j_ = _m_ - 1; _j_ > 0; _j_--)	{	\
+	    if (cmp(e, (t).elements[_j_])) {		\
+	        (i) = _j_; break;			\
+	    }						\
+	}						\
+    } while (0)
+
+#define memwise__tempo_erase(t, i)					\
     do {								\
 	MEMWISE_ASSERT(!(i < 0 || i >= (t).count),			\
 		       "tempo_erase", MEMWISE_ERROR_INDEX);		\
-	int _i_; uint_t _n_ = (t).count;				\
-	for (_i_ = i; _i_ < _n_; _i_++)					\
+	int _i_; int _n_ = (t).count;					\
+	for (_i_ = i; _i_ < _n_; _i_++) {				\
 	    (t).elements[_i_] = (t).elements[_i_ + 1];			\
+	}								\
     } while (0)
 
-#define tempo_remove(t, e) tempo_remove_cmp(t, e, MEMWISE_DEFCMP)
-#define tempo_remove_cmp(t, e, cmp)			\
+#define memwise__tempo_remove(t, e)			\
+    memwise__tempo_remove_cmp(t, e, MEMWISE_DEFCMP)
+
+#define memwise__tempo_remove_cmp(t, e, cmp)		\
     do {						\
 	int _k_;					\
-	tempo_find_cmp(t, e, _k_, cmp);			\
-	temp_erase(t, _k_);				\
+	memwise__tempo_find_cmp(t, e, _k_, cmp);	\
+	memwise__tempo_erase(t, _k_);			\
     } while (0)
 
 
-#define tempo_insert(t, i, e)						\
+#define memwise__tempo_insert(t, i, e)					\
     do {								\
-        MEMWISE_ASSERT((t).count < tempo_capacity(t),			\
+        MEMWISE_ASSERT((t).count < memwise__tempo_capacity(t),		\
 		       "tempo_insert", MEMWISE_ERROR_MEMORY);		\
-	int _i_; uint_t _n_ = (t).count++, _e_ = i;			\
+	int _i_; int _n_ = (t).count++, _e_ = i;			\
 	for (_i_ = _n_; _i_ < _e_; _i_--)				\
 	    (t).elements[_i_] = (t).elements[_i_ - 1];			\
 	(t).elements[_e_] = e;						\
     } while (0)
 
 
-#define tempo__foreach(t, type_t, v, i, n, elm)				\
+#define memwise__tempo__foreach(t, type_t, v, i, n, elm)		\
     type_t v; type_t* elm = (t).elements;				\
-    int i = 0; uint_t n = (t).count;					\
+    int i = 0; int n = (t).count;					\
     for (v = elm[i]; i < n; v = elm[++i]) 
 
 #define tempo_foreach(t, type_t, v)				\
-    tempo__foreach(t, type_t, v,				\
-		   _MGENSYM(_i_),				\
-		   _MGENSYM(_n_),				\
-		   _MGENSYM(_a_))
+    memwise__tempo__foreach(t, type_t, v,			\
+			    _MGENSYM(_i_),			\
+			    _MGENSYM(_n_),			\
+			    _MGENSYM(_a_))
 
 
 /**************************
  * Dynamic size array
  **************************/
-#define ARRAY_FIELDS(type_t)				\
-    int count, capacity; type_t* elements; membuf_t* membuffer
 
 /**
- * Dynamic array container structure
+ * Dynamic array container structure fields
  */
-#define array_t(type_t)      struct { ARRAY_FIELDS(type_t); }
+#define memwise__array_t(type_t)			\
+    int       count;					\
+    int       capacity;					\
+    type_t*   elements;					\
+    membuf_t* membuffer
 
 /**
  * Initialize array
@@ -158,7 +190,7 @@ typedef struct
  * @param a - The array
  * @param m - The memory buffer for elements space
  */
-#define array_init(a, m)						\
+#define memwise__array_init(a, m)					\
     do {								\
 	(a).count     = 0;						\
 	(a).capacity  = 0;						\
@@ -171,7 +203,7 @@ typedef struct
  *
  * @param a - The array
  */
-#define array_free(a)							\
+#define memwise__array_free(a)						\
     do {								\
 	membuf_collect((a).membuffer, (a).elements);			\
 									\
@@ -187,14 +219,14 @@ typedef struct
  * @param i - The index
  * @param v - The value
  */
-#define array_set(a, i, v)						\
+#define memwise__array_set(a, i, v)					\
     do {								\
 	int _i_ = i;							\
 									\
 	MEMWISE_ASSERT(_i_ > -1, "array_set", MEMWISE_ERROR_INDEX);	\
 									\
 	if (_i_ >= (a).count) (a).count = _i_ + 1;			\
-        array_ensure(a, (a).count);					\
+        memwise__array_ensure(a, (a).count);				\
 	(a).elements[_i_] = v;						\
     } while (0)
 
@@ -205,7 +237,7 @@ typedef struct
  * @param i - The index
  * @return pointer to the element
  */
-#define array_ref(a, i)							\
+#define memwise__array_ref(a, i)					\
     (MEMWISE_ASSERT((i) > -1, "array_ref", MEMWISE_ERROR_INDEX),	\
      (a).elements + i)
 
@@ -216,9 +248,10 @@ typedef struct
  * @param i - The index
  * @return The element's value
  */
-#define array_get(a, i)							\
+#define memwise__array_get(a, i)					\
     (MEMWISE_ASSERT((i) > -1 && (i) < (a).count,			\
-		    "array_get", MEMWISE_ERROR_INDEX),			\
+		    "array_get",					\
+		    MEMWISE_ERROR_INDEX),				\
      (a).elements[i])
 
 /**
@@ -228,7 +261,7 @@ typedef struct
  * @param a - The array
  * @return The last element's value
  */
-#define array_pop(a)							\
+#define memwise__array_pop(a)						\
     (MEMWISE_ASSERT((a).count > 0, "array_pop", MEMWISE_ERROR_EMPTY),	\
      (a).elements[--(a).count])
 
@@ -238,7 +271,7 @@ typedef struct
  * @param a - The array
  * @param v - The value
  */
-#define array_push(a, v) array_set(a, (a).count, v)
+#define memwise__array_push(a, v) memwise__array_set(a, (a).count, v)
 
 /**
  * Ensure the array that has enough space to contain 'c' elements
@@ -246,11 +279,11 @@ typedef struct
  * @param a - The array
  * @param c - The expected capacity
  */
-#define array_ensure(a, c)				\
-    do {						\
-	int _c_ = c;					\
-							\
-	if (_c_ > (a).capacity) array_expand(a, _c_);	\
+#define memwise__array_ensure(a, c)				\
+    do {							\
+	int _c_ = (int)(c);					\
+								\
+	if (_c_ > (a).capacity) memwise__array_expand(a, _c_);	\
     } while (0)
 
 /**
@@ -259,7 +292,7 @@ typedef struct
  * @param a - The array
  * @param c - Minimal capacity
  */
-#define array_expand(a, c)						\
+#define memwise__array_expand(a, c)					\
       do {								\
 	  /* New container capacity */					\
 	  int _c1_ = (a).capacity; /* Add number to avoid with _c_ */	\
@@ -277,7 +310,7 @@ typedef struct
 									\
 	  /* Storing new variables */					\
 	  (a).capacity = _c1_;						\
-	  (a).elements = new_elements;					\
+	  _MPTR_ASSIGN((a).elements, new_elements);			\
       } while (0)
 
 /**
@@ -288,7 +321,7 @@ typedef struct
  * @param out - The variable that receive output
  * @param cmp - Compare expression
  */
-#define array_find_cmp(a, v, out, cmp)		\
+#define memwise__array_find_cmp(a, v, out, cmp)	\
     do {					\
 	out = -1;				\
 						\
@@ -310,7 +343,8 @@ typedef struct
  * @param v   - The value
  * @param out - The variable that receive output
  */
-#define array_find(a, v, out) array_find_cmp(a, v, out, MEMWISE_DEFCMP)
+#define memwise__array_find(a, v, out) \
+    memwise__array_find_cmp(a, v, out, MEMWISE_DEFCMP)
 
 /**
  * Find the element has the given value in reverse order,
@@ -321,7 +355,7 @@ typedef struct
  * @param out - The variable that receive output
  * @param cmp - Compare expression
  */
-#define array_rfind_cmp(a, v, out, cmp)			\
+#define memwise__array_rfind_cmp(a, v, out, cmp)	\
     do {						\
 	out = -1;					\
 							\
@@ -343,7 +377,8 @@ typedef struct
  * @param v   - The value
  * @param out - The variable that receive output
  */
-#define array_rfind(a, v, out) array_find_cmp(a, v, out, MEMWISE_DEFCMP)
+#define memwise__array_rfind(a, v, out)		\
+    memwise__array_rfind_cmp(a, v, out, MEMWISE_DEFCMP)
 
 /**
  * Erase the element at given the position
@@ -351,7 +386,7 @@ typedef struct
  * @param a - The array
  * @param i - The index of the element position
  */
-#define array_erase(a, i)						\
+#define memwise__array_erase(a, i)					\
     do {								\
 	int _i1_ = i;							\
 									\
@@ -372,14 +407,14 @@ typedef struct
  * @param v   - The value
  * @param cmp - Compare expression (macros or function)
  */
-#define array_remove_cmp(a, v, cmp)					\
+#define memwise__array_remove_cmp(a, v, cmp)				\
     do {								\
 	int _j_; int _n_ = (a).count;					\
 	for (_j_ = 0; _j_ < _n_; _j_++)					\
 	{								\
 	    if (cmp((a).elements[_j_], v))				\
 	    {								\
-		array_erase(_j_);					\
+		memwise__array_erase(a, _j_);				\
 		break;							\
 	    }								\
 	}								\
@@ -391,9 +426,10 @@ typedef struct
  * @param a - The array
  * @param v - The value
  */
-#define array_remove(a, v) array_remove_cmp(a, v, MEMWISE_DEFCMP)
+#define memwise__array_remove(a, v)			\
+    memwise__array_remove_cmp(a, v, MEMWISE_DEFCMP)
 
-#define array__foreach(a, type_t, v, i, n, arr)				\
+#define memwise__array__foreach(a, type_t, v, i, n, arr)		\
     type_t v; type_t* arr = (a).elements;				\
     int i = 0; int n = (a).count;					\
     if (n > 0) v = arr[0];						\
@@ -408,18 +444,18 @@ typedef struct
  * @param v      - The value variable name
  */
 #define array_foreach(a, type_t, i, v)				\
-    array__foreach(a, type_t, v, i,				\
-		   _MGENSYM(__n_),				\
-		   _MGENSYM(__a_))
+    memwise__array__foreach(a, type_t, v, i,			\
+			    _MGENSYM(__n_),			\
+			    _MGENSYM(__a_))
 
 
 /**************************
  * Queue
  **************************/
-#define QUEUE_FIELDS(val_t) int head, tail; uint_t capacity; val_t* elements
-#define queue_t(val_t) struct { QUEUE_FIELDS(val_t); }
+#define memwise__queue_t(type_t)					\
+    int head, tail, capacity; type_t* elements; membuf_t* membuffer
 
-#define queue_init(q, c)						\
+#define memwise__queue_init(q, c)					\
     do {								\
 	(q).head     = 0;						\
 	(q).tail     = 0;						\
@@ -428,7 +464,7 @@ typedef struct
 	(q).elements = vlib__malloc(c * sizeof((s).elements[0]));	\
     } while (0)
 	
-#define queue_free(q)							\
+#define memwise__queue_free(q)						\
     do {								\
 	vlib__free((q).elements);					\
 	(q).head     = 0;						\
@@ -438,14 +474,14 @@ typedef struct
 	(q).elements = 0;						\
     } while (0)
 
-#define queue_peek(q) (q).elements[(q).head]
+#define memwise__queue_peek(q) (q).elements[(q).head]
 
-#define queue_enque(q, e)			\
+#define memwise__queue_enque(q, e)		\
     do {					\
 	(q).elements[(q).tail++] = e;		\
     } while (0)
 
-#define queue_deque(q, e)			\
+#define memwise__queue_deque(q, e)		\
     do {					\
 	e = queue_peek(q);			\
 	(q).head++;				\
@@ -454,54 +490,15 @@ typedef struct
 
 
 /**************************
- * Stack
- **************************/
-#define STACK_FIELDS(val_t) uint_t count, capacity; val_t* elements
-#define stack_t(val_t) struct { STACK_FIELDS(val_t); }
-
-#define stack_init(s, c)						\
-    do {								\
-	(s).count    = 0;						\
-	(s).capacity = c;						\
-	(s).elements = vlib__malloc(c * sizeof((s).elements[0]));	\
-    } while (0)
-	
-#define stack_free(s)							\
-    do {								\
-	vlib__free((s).elements);					\
-	(s).count    = 0;						\
-	(s).capacity = 0;						\
-	(s).elements = 0;						\
-    } while (0)
-
-#define stack_peek(s) (s).elements[(s).count - 1]
-
-#define stack_push(s, e)						\
-    do {								\
-	(s).count++;							\
-	if ((s).count > (s).capacity) {					\
-	    const uint_t n = (s).capacity *= 2;				\
-	    const uint_t m = sizeof((s).elements[0]);			\
-	    (s).elements   = vlib__realloc((s).elements, n * m);	\
-	}								\
-	(s).elements[(s).count - 1] = e;				\
-    } while (0)
-      
-#define stack_pop(s) (s).elements[--(s).count]	
-
-
-/**************************
  * Table
  **************************/
-#define TABLE_BUCKET 32
-#define TABLE_FIELDS(key_t, val_t)				\
+#define MEMWISE__TABLE_BUCKET 32
+#define MEMWISE__TABLE_FIELDS(key_t, val_t)			\
     uint_t hashs[TABLE_BUCKET];		 /* Hash  data */	\
     uint_t count, capacity;		 /* Table size */	\
     int* nexts; key_t* keys; val_t* vals /* Table data */
 
-#define table_t(key_t, val_t) struct { TABLE_FIELDS(key_t, val_t); }
-
-#define table_init(t, c)						\
+#define memwise__table_init(t, c)					\
     do {								\
 	(t).count = 0;							\
 	(t).capacity = c;						\
@@ -517,7 +514,7 @@ typedef struct
 	}								\
     } while (0)
 
-#define table_free(t)							\
+#define memwise__table_free(t)						\
     do {								\
 	vlib__free((t).nexts);						\
 	vlib__free((t).keys);						\
@@ -529,7 +526,7 @@ typedef struct
 	(t).vals     = 0;						\
     } while (0)
 
-#define table_get(t, k, v, hash, cmp)			\
+#define memwise__table_get(t, k, v, hash, cmp)		\
     do {						\
 	uint_t _h_ = hash(k) % TABLE_BUCKET;		\
 	int    _i_ = (t).hashs[_h_];			\
@@ -542,7 +539,7 @@ typedef struct
 	}						\
     } while (0)
 
-#define table_has(t, k, v, hash, cmp)					\
+#define memwise__table_has(t, k, v, hash, cmp)				\
     do {								\
 	v = 0;								\
 	uint_t _h_ = hash(k) % TABLE_BUCKET;				\
@@ -556,7 +553,7 @@ typedef struct
 	}								\
     } while (0)
 
-#define table_set(t, k, v, hash, cmp)					\
+#define memwise__table_set(t, k, v, hash, cmp)				\
     do {								\
 	uint_t _h_; int _i_, _p_ = -1;					\
         _h_ = hash(k) % TABLE_BUCKET;					\
@@ -589,6 +586,196 @@ typedef struct
 	(t).vals[_i_] = v;						\
     } while (0)
 
+
+#if MEMWISE_C_VERSION || !defined(__cplusplus)
+/* BEGIN OF C VERSIONS */
+
+
+#define MEMWISE_DEFCMP(a, b) ((a) == (b))
+
+/**************************
+ * Temporary array
+ **************************/
+#define tempo_t(type_t, c) struct { memwise__tempo_(type_t, c); }     
+
+#define tempo_init(t) memwise__tempo_init(t)
+
+#define tempo_capacity(t) memwise__tempo_capacity(t)
+
+#define tempo_set(t, i, e) memwise__tempo_set(t, i, e)
+
+#define tempo_get(t, i) memwise__tempo_get(t, i)
+
+#define tempo_ref(t, i) memwise__tempo_ref(t, i)
+
+#define tempo_pop(t) memwise__tempo_pop(t)
+
+#define tempo_push(t, e) memwise__tempo_push(t, e)
+
+#define tempo_find(t, e, i) memwise__tempo_find(t, e, i)
+
+#define tempo_find_cmp(t, e, i, cmp) memwise__tempo_find_cmp(t, e, i, cmp)
+
+#define tempo_erase(t, i) memwise__tempo_erase(t, i) 
+
+#define tempo_remove(t, e) memwise__tempo_remove(t, e)
+
+#define tempo_remove_cmp(t, e, cmp) memwise__tempo_remove_cmd(t, e, cmp)
+
+#define tempo_insert(t, i, e) memwise__tempo_insert(t, i, e)
+
+
+/**************************
+ * Dynamic size array
+ **************************/
+
+/**
+ * Dynamic array container structure fields
+ */
+#define array_t(type_t) struct { memwise__array_t(type_t); }
+
+/**
+ * Initialize array
+ *
+ * @param a - The array
+ * @param m - The memory buffer for elements space
+ */
+#define array_init(a, m) memwise__array_init(a, m)
+
+/**
+ * Return all memory usage of the array to its own memory buffer
+ *
+ * @param a - The array
+ */
+#define array_free(a) memwise__array_free(a)
+
+/**
+ * Set array element's value at given index
+ *
+ * @param a - The array
+ * @param i - The index
+ * @param v - The value
+ */
+#define array_set(a, i, v) memwise__array_set(a, i, v)
+
+/**
+ * Get the pointer reference to element's slot at given index
+ *
+ * @param a - The array
+ * @param i - The index
+ * @return pointer to the element
+ */
+#define array_ref(a, i) memwise__array_ref(a, i)
+
+/**
+ * Get the element's value at given index
+ *
+ * @param a - The array
+ * @param i - The index
+ * @return The element's value
+ */
+#define array_get(a, i) memwise__array_get(a, i)
+
+/**
+ * Remove the last element and return its value, 
+ * abort() when array is empty
+ *
+ * @param a - The array
+ * @return The last element's value
+ */
+#define array_pop(a) memwise__array_pop(a)
+
+/**
+ * Create new element at the last position with given value
+ * 
+ * @param a - The array
+ * @param v - The value
+ */
+#define array_push(a, v) memwise__array_push(a, v)
+
+/**
+ * Ensure the array that has enough space to contain 'c' elements
+ *
+ * @param a - The array
+ * @param c - The expected capacity
+ */
+#define array_ensure(a, c) memwise__array_ensure(a, c)
+
+/**
+ * Expand the array that make enough space to contain 'c' elements
+ * 
+ * @param a - The array
+ * @param c - Minimal capacity
+ */
+#define array_expand(a, c) mmewise__array_expand(a, c)
+
+/**
+ * Find the element has the given value, with specified compare expression
+ * 
+ * @param a   - The array
+ * @param v   - The value
+ * @param out - The variable that receive output
+ * @param cmp - Compare expression
+ */
+#define array_find_cmp(a, v, out, cmp)		\
+    memwise__array_find_cmp(a, v, out, cmp)
+
+/**
+ * Find the element has the given value in reverse order
+ * 
+ * @param a   - The array
+ * @param v   - The value
+ * @param out - The variable that receive output
+ */
+#define array_find(a, v, out) memwise__array_find(a, v, out)
+
+/**
+ * Find the element has the given value in reverse order,
+ * with specified compare expression
+ * 
+ * @param a   - The array
+ * @param v   - The value
+ * @param out - The variable that receive output
+ * @param cmp - Compare expression
+ */
+#define array_rfind_cmp(a, v, out, cmp)		\
+    memwise__array_rfind_cmp(a, v, out, cmp)
+
+/**
+ * Find the element has the given value in reverse order
+ * 
+ * @param a   - The array
+ * @param v   - The value
+ * @param out - The variable that receive output
+ */
+#define array_rfind(a, v, out) memwise__array_rfind(a, v, out)
+
+/**
+ * Erase the element at given the position
+ *
+ * @param a - The array
+ * @param i - The index of the element position
+ */
+#define array_erase(a, i) memwise__array_erase(a, i)
+
+/**
+ * Remove the element that fit the requirement
+ * 
+ * @param a   - The array
+ * @param v   - The value
+ * @param cmp - Compare expression (macros or function)
+ */
+#define array_remove_cmp(a, v, cmp) memwise__array_remove_cmp(a, v, cmp)
+
+/**
+ * Remove the element that has given value
+ *
+ * @param a - The array
+ * @param v - The value
+ */
+#define array_remove(a, v) memwise__array_remove(a, v)
+
+
 /* END OF C VERSION */
 #else
 /* BEGIN OF C++ VERSION */
@@ -599,15 +786,14 @@ typedef struct
 template <typename type_t, int capacity>
 struct tempo_t
 {
-    int    count;
-    type_t elements[capacity];
+    memwise__tempo_t(type_t, capacity);
 
-    inline T& operator[](int index)
+    inline type_t& operator[](int index)
     {
 	return elements[index];
     }
 
-    inline const T& operator[](int index) const
+    inline const type_t& operator[](int index) const
     {
 	return elements[index];
     }
@@ -619,44 +805,199 @@ struct tempo_t
 template <typename type_t>
 struct array_t
 {
-    int       count;
-    int       capacity;
-    type_t*   elements;
-    membuf_t* membuffer;
+    memwise__array_t(type_t);
 
-    inline T& operator[](int index)
+    inline type_t& operator[](int index)
     {
 	return elements[index];
     }
 
-    inline const T& oeprator[](int index) const
+    inline const type_t& operator[](int index) const
     {
 	return elements[index];
     }
 };
 
-/**
- * Stack
- */
-template <typename type_t>
-struct stack_t
+template <typename type_t, int capacity>
+inline void tempo_init(tempo_t<type_t, capacity>& tempo)
 {
-    array_t<type_t> buffer;
-};
+    memwise__tempo_init(tempo);
+}
 
-/**
- * Queue
- */
-template <typename type_t>
-struct queue_t
+template <typename type_t, int capacity>
+void tempo_set(tempo_t<type_t, capacity>& tempo, int index, const type_t& value)
 {
-    int       head;
-    int       tail;
-    int       capacity;
-    type_t*   elements;
-    membuf_t* membuffer;
-};
+    memwise__tempo_set(tempo, index, value);
+}
 
+template <typename type_t, int capacity>
+inline const type_t& tempo_get(const tempo_t<type_t, capacity>& tempo, int index)
+{
+    return memwise__tempo_get(tempo, index);
+}
+
+template <typename type_t, int capacity>
+inline type_t* tempo_ref(tempo_t<type_t, capacity>& tempo, int index)
+{
+    return memwise__tempo_ref(tempo, index);
+}
+
+template <typename type_t, int capacity>
+inline const type_t* tempo_ref(const tempo_t<type_t, capacity>& tempo, int index)
+{
+    return memwise__tempo_ref(tempo, index);
+}
+
+template <typename type_t, int capacity>
+inline const type_t& tempo_pop(tempo_t<type_t, capacity>& tempo)
+{
+    return memwise__tempo_pop(tempo);
+}
+
+template <typename type_t, int capacity>
+inline void tempo_push(tempo_t<type_t, capacity>& tempo, const type_t& value)
+{
+    tempo_set(tempo, value);
+}
+
+template <typename type_t, int capacity>
+int tempo_find(const tempo_t<type_t, capacity>& tempo, const type_t& value)
+{
+    int res;
+    memwise__tempo_find(tempo, value, res);
+    return res;
+}
+
+template <typename type_t, int capacity>
+int tempo_rfind(const tempo_t<type_t, capacity>& tempo, const type_t& value)
+{
+    int res;
+    memwise__tempo_rfind(tempo, value, res);
+    return res;
+}
+
+template <typename type_t, int capacity>
+void tempo_erase(tempo_t<type_t, capacity>& tempo, int index)
+{
+    memwise__tempo_erase(tempo, index);
+}
+
+template <typename type_t, int capacity>
+void tempo_remove(tempo_t<type_t, capacity>& tempo, const type_t& value)
+{
+    memwise__tempo_remove(tempo, value);
+}
+
+
+template <typename type_t, int capacity>
+void tempo_insert(tempo_t<type_t, capacity>& tempo, int index, const type_t& value)
+{
+    memwise__tempo_insert(tempo, index, value);
+}
+
+template <typename type_t>
+inline void array_init(array_t<type_t>& array, membuf_t* membuffer)
+{
+    memwise__array_init(array, membuffer);
+}
+
+template <typename type_t>
+inline void array_free(array_t<type_t>& array)
+{
+    memwise__array_free(array);
+}
+
+template <typename type_t>
+void array_set(array_t<type_t>& array, int index, const type_t& value)
+{
+    memwise__array_set(array, index, value);
+}
+
+template <typename type_t>
+inline const type_t& array_get(const array_t<type_t>& array, int index)
+{
+    return memwise__array_get(array, index);
+}
+
+template <typename type_t>
+inline type_t* array_ref(array_t<type_t>& array, int index)
+{
+    return memwise__array_ref(array, index);
+}
+
+template <typename type_t>
+inline const type_t* array_ref(const array_t<type_t>& array, int index)
+{
+    return memwise__array_ref(array, index);
+}
+
+template <typename type_t>
+inline const type_t& array_pop(array_t<type_t>& array)
+{
+    return memwise__array_pop(array);
+}
+
+template <typename type_t>
+inline void array_push(array_t<type_t>& array, const type_t& value)
+{
+    array_set(array, array.count, value);
+}
+
+template <typename type_t>
+void array_expand(array_t<type_t>& array, int capacity)
+{
+    memwise__array_expand(array, capacity);
+}
+
+template <typename type_t>
+inline bool array_ensure(array_t<type_t>& array, int capacity)
+{
+    if (capacity > array.capacity)
+    {
+	array_expand(array, capacity);
+    }
+    return true;
+}
+
+template <typename type_t>
+inline bool array_ensure(const array_t<type_t>& array, int capacity)
+{
+    return (capacity <= array.capacity);
+}
+
+template <typename type_t>
+int array_find(const array_t<type_t>& array, const type_t& value)
+{
+    int res;
+    memwise__array_find(array, value, res);
+    return res;
+}
+
+template <typename type_t>
+int array_rfind(const array_t<type_t>& array, const type_t& value)
+{
+    int res;
+    memwise__array_rfind(array, value, res);
+    return res;
+}
+
+template <typename type_t>
+void array_erase(array_t<type_t>& array, int index)
+{
+    memwise__array_erase(array, index);
+}
+
+template <typename type_t>
+void array_remove(array_t<type_t>& array, const type_t& value)
+{
+    memwise__array_remove(array, value);
+}
+
+template <typename type_t>
+void array_insert(array_t<type_t>& array, int index, const type_t& value)
+{
+    memwise__array_insert(array, index, value);
+}
 
 /* END OF C++ VERSIONS */
 #endif
