@@ -455,37 +455,59 @@ typedef struct
 #define memwise__queue_t(type_t)					\
     int head, tail, capacity; type_t* elements; membuf_t* membuffer
 
-#define memwise__queue_init(q, c)					\
+#define memwise__queue_init(q, m)					\
     do {								\
-	(q).head     = 0;						\
-	(q).tail     = 0;						\
-	(q).count    = 0;						\
-	(q).capacity = c;						\
-	(q).elements = vlib__malloc(c * sizeof((s).elements[0]));	\
+	(q).head      = 0;						\
+	(q).tail      = 0;						\
+	(q).capacity  = 0;						\
+	(q).elements  = 0;						\
+	(q).membuffer = m;						\
     } while (0)
 	
 #define memwise__queue_free(q)						\
     do {								\
-	vlib__free((q).elements);					\
+	membuf_collect((q).membuffer, (q).elements);			\
+									\
 	(q).head     = 0;						\
 	(q).tail     = 0;						\
-	(q).count    = 0;						\
 	(q).capacity = 0;						\
 	(q).elements = 0;						\
     } while (0)
 
-#define memwise__queue_peek(q) (q).elements[(q).head]
+#define memwise__queue_peek(q)  (q).elements[(q).head]
+#define memwise__queue_count(q) ((q).tail - (q).head)
+#define memwise__queue_deque(q)						\
+    (MEMWISE_ASSERT(memwise__queue_count(q) > 0,			\
+		    "queue_deque: ", MEMWISE_ERROR_EMPTY),		\
+     (q).elements[(q).head++])
 
-#define memwise__queue_enque(q, e)		\
-    do {					\
-	(q).elements[(q).tail++] = e;		\
-    } while (0)
-
-#define memwise__queue_deque(q, e)		\
-    do {					\
-	e = queue_peek(q);			\
-	(q).head++;				\
-	(q).count--;				\
+#define memwise__queue_enque(q, e)					\
+    do {								\
+	if ((q).tail >= (q).capacity) {					\
+	    if ((q).head > 0) {						\
+		memcpy((q).elements,					\
+		       (q).elements + (q).head,				\
+		       (q).tail - (q).head);				\
+	    } else {							\
+		int   new_capacity;					\
+		if ((q).capacity <= 0) new_capacity = 64;		\
+		else                   new_capacity = (q).capacity * 2;	\
+									\
+		int   element_size = sizeof ((q).elements[0]);	        \
+		void* new_elements =					\
+		    membuf_extract((q).membuffer,			\
+				   new_capacity * element_size);	\
+									\
+		memset(new_elements,					\
+		       (q).elements,					\
+		       (q).capacity * element_size);			\
+		membuf_collect((q).membuffer, (q).elements);		\
+									\
+		(q).capacity = new_capacity;				\
+		_MPTR_ASSIGN((q).elements, new_elements);		\
+	    }								\
+	}								\
+	(q).elements[(q).tail++] = e;					\
     } while (0)
 
 
@@ -494,8 +516,8 @@ typedef struct
  **************************/
 #define MEMWISE__TABLE_BUCKET 32
 #define MEMWISE__TABLE_FIELDS(key_t, val_t)			\
-    uint_t hashs[TABLE_BUCKET];		 /* Hash  data */	\
-    uint_t count, capacity;		 /* Table size */	\
+    int hashs[MEMWISE__TABLE_BUCKET]; /* Hash  data */	        \
+    int count, capacity;		 /* Table size */	\
     int* nexts; key_t* keys; val_t* vals /* Table data */
 
 #define memwise__table_init(t, c)					\
@@ -775,6 +797,13 @@ typedef struct
  */
 #define array_remove(a, v) memwise__array_remove(a, v)
 
+#define queue_t(type_t)   struct { memwise__queue_t(type_t); }
+#define queue_init(q, m)  memwise__queue_init(q, m)
+#define queue_free(q)     memwise__queue_free(q)
+#define queue_peek(q)     memwise__queue_peek(q)
+#define queue_count(q)    memwise__queue_count(q)
+#define queue_deque(q)    memwise__queue_deque(q)
+#define queue_enque(q, v) memwise__queue_enque(q, v)
 
 /* END OF C VERSION */
 #else
@@ -816,6 +845,12 @@ struct array_t
     {
 	return elements[index];
     }
+};
+
+template <typename type_t>
+struct queue_t
+{
+    memwise__queue_t(type_t);
 };
 
 template <typename type_t, int capacity>
@@ -997,6 +1032,48 @@ template <typename type_t>
 void array_insert(array_t<type_t>& array, int index, const type_t& value)
 {
     memwise__array_insert(array, index, value);
+}
+
+template <typename type_t>
+inline void queue_init(queue_t<type_t>& queue, membuf_t* membuffer)
+{
+    memwise__queue_init(queue, membuffer);
+}
+
+template <typename type_t>
+inline void queue_free(queue_t<type_t>& queue)
+{
+    memwise__queue_free(queue);
+}
+
+template <typename type_t>
+inline type_t& queue_peek(queue_t<type_t>& queue)
+{
+    return memwise__queue_peek(queue);
+}
+
+template <typename type_t>
+inline const type_t& queue_peek(const queue_t<type_t>& queue)
+{
+    return memwise__queue_peek(queue);
+}
+
+template <typename type_t>
+inline int queue_count(queue_t<type_t>& queue)
+{
+    return memwise__queue_count(queue);
+}
+
+template <typename type_t>
+inline const type_t& queue_deque(queue_t<type_t>& queue)
+{
+    return memwise__queue_deque(queue);
+}
+
+template <typename type_t>
+void queue_enque(queue_t<type_t>& queue, const type_t& value)
+{
+    memwise__queue_enque(queue, value);
 }
 
 /* END OF C++ VERSIONS */
