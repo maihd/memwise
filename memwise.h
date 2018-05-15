@@ -515,32 +515,33 @@ typedef struct
  * Table
  **************************/
 #define MEMWISE__TABLE_BUCKET 32
-#define MEMWISE__TABLE_FIELDS(key_t, val_t)			\
-    int hashs[MEMWISE__TABLE_BUCKET]; /* Hash  data */	        \
-    int count, capacity;		 /* Table size */	\
-    int* nexts; key_t* keys; val_t* vals /* Table data */
+#define memwise__table_t(key_t, val_t)				\
+    int hashs[MEMWISE__TABLE_BUCKET];     /* Hash  data */	\
+    int count, capacity;		  /* Table size */	\
+    int* nexts; key_t* keys; val_t* vals; /* Table data */	\
+    membuf_t* membuffer                   /* Memory buffer */
 
-#define memwise__table_init(t, c)					\
+#define memwise__table_init(t, m)					\
     do {								\
-	(t).count = 0;							\
-	(t).capacity = c;						\
-	(t).nexts = vlib__malloc(c * sizeof((t).nexts[0]));		\
-	(t).keys  = vlib__malloc(c * sizeof((t).keys[0]));		\
-	(t).vals  = vlib__malloc(c * sizeof((t).vals[0]));		\
+	(t).count     = 0;						\
+	(t).capacity  = 0;						\
+	(t).nexts     = 0;						\
+	(t).keys      = 0;						\
+	(t).vals      = 0;						\
+	(t).membuffer = m;						\
+									\
 	int _i_;							\
-	for (_i_ = 0; _i_ < TABLE_BUCKET; _i_++) {			\
+	for (_i_ = 0; _i_ < MEMWISE__TABLE_BUCKET; _i_++) {		\
 	    (t).hashs[_i_] = -1;					\
-	}								\
-	for (_i_ = 0; _i_ < c; _i_++) {					\
-	    (t).nexts[_i_] = -1;					\
 	}								\
     } while (0)
 
 #define memwise__table_free(t)						\
     do {								\
-	vlib__free((t).nexts);						\
-	vlib__free((t).keys);						\
-	vlib__free((t).vals);						\
+        membuf_collect((t).membuffer, (t).nexts);			\
+	membuf_collect((t).membuffer, (t).keys);			\
+        membuf_collect((t).membuffer, (t).vals);			\
+									\
 	(t).count    = 0;						\
 	(t).capacity = 0;						\
 	(t).nexts    = 0;						\
@@ -550,8 +551,8 @@ typedef struct
 
 #define memwise__table_get(t, k, v, hash, cmp)		\
     do {						\
-	uint_t _h_ = hash(k) % TABLE_BUCKET;		\
-	int    _i_ = (t).hashs[_h_];			\
+	int _h_ = hash(k) % MEMWISE__TABLE_BUCKET;	\
+	int _i_ = (t).hashs[_h_];			\
 	while (_i_ > -1) {				\
 	    if (cmp(k, (t).keys[_i_])) {		\
 		v = (t).vals[_i_];			\
@@ -564,8 +565,8 @@ typedef struct
 #define memwise__table_has(t, k, v, hash, cmp)				\
     do {								\
 	v = 0;								\
-	uint_t _h_ = hash(k) % TABLE_BUCKET;				\
-	int    _i_ = (t).hashs[_h_];					\
+	int _h_ = hash(k) % MEMWISE__TABLE_BUCKET;			\
+	int _i_ = (t).hashs[_h_];					\
 	while (_i_ > -1) {						\
 	    if (cmp(k, (t).keys[_i_])) {				\
 		v = 1;							\
@@ -575,28 +576,48 @@ typedef struct
 	}								\
     } while (0)
 
+#define memwise__table_resize(t, m, o, c)				\
+    do {								\
+	membuf_t* _buf_ = (t).membuffer;				\
+        void*     _new_ = membuf_extract(_buf_, c * sizeof((t).m[0]));	\
+	memcpy(_new_, (t).m, o * sizeof((t).m[0]));			\
+	membuf_collect(_buf_, (t).m);					\
+	_MPTR_ASSIGN((t).m, _new_);					\
+    } while (0)					
+
 #define memwise__table_set(t, k, v, hash, cmp)				\
     do {								\
-	uint_t _h_; int _i_, _p_ = -1;					\
-        _h_ = hash(k) % TABLE_BUCKET;					\
+	int _h_, _i_, _p_ = -1;						\
+        _h_ = hash(k) % MEMWISE__TABLE_BUCKET;				\
 	_i_ = (t).hashs[_h_];						\
 	while (_i_ > -1) {						\
 	    if (cmp(k, (t).keys[_i_])) {				\
-		goto __set__;						\
+		goto _memwise__set_;					\
 	    }								\
 	    _p_ = _i_; _i_ = (t).nexts[_p_];				\
 	}								\
+									\
 	_i_ = (t).count;						\
 	if (++(t).count > (t).capacity) {				\
-	    const uint_t c = (t).capacity *= 2;				\
-	    (t).nexts = vlib__realloc((t).nexts, c * sizeof((t).nexts[0])); \
-	    (t).keys  = vlib__realloc((t).keys, c * sizeof((t).keys[0])); \
-	    (t).vals  = vlib__realloc((t).vals, c * sizeof((t).vals[0])); \
+	    if ((t).capacity <= 0) (t).capacity = 32;			\
+									\
+	    const int old_cap = (t).count - 1;				\
+	    const int new_cap = (t).capacity *= 2;			\
+	    printf("old_cap: %d, new_cap: %d\n", old_cap, new_cap);	\
+	    printf("Resize nexts\n");					\
+	    memwise__table_resize(t, nexts, old_cap, new_cap);		\
+	    printf("Resize keys\n");					\
+	    memwise__table_resize(t,  keys, old_cap, new_cap);		\
+	    printf("Resize vals\n");					\
+	    memwise__table_resize(t,  vals, old_cap, new_cap);		\
+	    printf("Resize done\n");					\
+									\
 	    int _j_;							\
-	    for (_j_ = (t).count; _j_ < c; _j_++) {			\
+	    for (_j_ = old_cap; _j_ < new_cap; _j_++) {			\
 		(t).nexts[_i_] = -1;					\
 	    }								\
 	}								\
+									\
 	if (_p_ < 0) {							\
 	    (t).hashs[_h_] = _i_;					\
 	} else {							\
@@ -604,7 +625,7 @@ typedef struct
 	}								\
 	(t).nexts[_i_] = -1;						\
 	(t).keys[_i_] = k;						\
-    __set__:								\
+    _memwise__set_:							\
 	(t).vals[_i_] = v;						\
     } while (0)
 
@@ -805,9 +826,37 @@ typedef struct
 #define queue_deque(q)    memwise__queue_deque(q)
 #define queue_enque(q, v) memwise__queue_enque(q, v)
 
+#define table_t(key_t, val_t) struct { memwise__table_t(key_t, val_t); }
+#define table_init(t, m) memwise__table_init(t, m)
+#define table_free(t)    memwise__table_free(t)
+#define table_get(t, key, val, hash, cmp) \
+    memwise__table_get(t, key, val, hash, cmp)
+#define table_set(t, key, val, hash, cmp) \
+    memwise__table_set(t, key, val, hash, cmp)
+#define table_has(t, key, val, hash, cmp)
+
 /* END OF C VERSION */
 #else
 /* BEGIN OF C++ VERSION */
+
+template <typename type_t>
+inline bool table_cmp_f(const type_t& a, const type_t& b)
+{
+    return a == b;
+}
+
+template <typename type_t>
+inline int table_hash_f(const type_t& x)
+{
+    union
+    {
+        type_t x;
+	int    i;
+    } cvt;
+
+    cvt.x = x;
+    return cvt.i;
+}
 
 /**
  * Temporary array
@@ -851,6 +900,12 @@ template <typename type_t>
 struct queue_t
 {
     memwise__queue_t(type_t);
+};
+
+template <typename key_t, typename val_t>
+struct table_t
+{
+    memwise__table_t(key_t, val_t);
 };
 
 template <typename type_t, int capacity>
@@ -925,7 +980,9 @@ void tempo_remove(tempo_t<type_t, capacity>& tempo, const type_t& value)
 
 
 template <typename type_t, int capacity>
-void tempo_insert(tempo_t<type_t, capacity>& tempo, int index, const type_t& value)
+void tempo_insert(tempo_t<type_t, capacity>& tempo,
+		  int index,
+		  const type_t& value)
 {
     memwise__tempo_insert(tempo, index, value);
 }
@@ -1074,6 +1131,42 @@ template <typename type_t>
 void queue_enque(queue_t<type_t>& queue, const type_t& value)
 {
     memwise__queue_enque(queue, value);
+}
+
+template <typename key_t, typename val_t>
+inline void table_init(table_t<key_t, val_t>& table, membuf_t* membuffer)
+{
+    memwise__table_init(table, membuffer);
+}
+
+template <typename key_t, typename val_t>
+inline void table_free(table_t<key_t, val_t>& table)
+{
+    memwise__table_free(table);
+}
+
+template <typename key_t, typename val_t>
+void table_set(table_t<key_t, val_t>& table,
+		      const key_t& key,
+		      const val_t& val)
+{
+    memwise__table_set(table, key, val, table_hash_f<key_t>, table_cmp_f<key_t>);
+}
+
+template <typename key_t, typename val_t>
+val_t table_get(const table_t<key_t, val_t>& table, const key_t& key)
+{
+    val_t val;
+    memwise__table_get(table, key, val, table_hash_f<key_t>, table_cmp_f<key_t>);
+    return val;
+}
+
+template <typename key_t, typename val_t>
+bool table_has(const table_t<key_t, val_t>& table, const key_t& key)
+{
+    bool val;
+    memwise__table_has(table, key, val, table_hash_f<key_t>, table_cmp_f<key_t>);
+    return val;
 }
 
 /* END OF C++ VERSIONS */

@@ -1,4 +1,6 @@
+#include <time.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "memwise.h"
 
 void* membuf_default_extract(void* data, int size, int align)
@@ -16,6 +18,8 @@ void membuf_default_collect(void* data, void* pointer)
 
 int main(int argc, char* argv[])
 {
+    srand(time(NULL));
+    
     printf("Memwise unit test\n");
     
     membuf_t membuf_default;
@@ -63,6 +67,19 @@ int main(int argc, char* argv[])
     }
     
     array_free(arr);
+
+    table_t<int, int> table;
+    table_init(table, &membuf_default);
+
+    int count = 10;
+    while (count--)
+    {
+	int key = rand() % 100;
+	table_set(table, key, rand());
+	printf("table[%2d] => %d\n", key, table_get(table, key));
+    }
+    
+    table_free(table);
     
     return 0;
 }
