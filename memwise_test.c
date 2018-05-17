@@ -107,8 +107,7 @@ int main(int argc, char* argv[])
     intarr_push(&arr, 8);
     intarr_push(&arr, 9);
     intarr_push(&arr, 10);
-    
-	
+    	
     array_foreach(arr, int, i, v)
     {
 	printf("%2d. %d\n", i + 1, v);

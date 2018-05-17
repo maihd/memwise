@@ -629,6 +629,36 @@ typedef struct
 	(t).vals[_i_] = v;						\
     } while (0)
 
+#define memwise__table_remove(t, key, hash, cmp)			\
+    do {								\
+	int _h_ = hash(key) % MEMWISE__TABLE_BUCKET;			\
+	int _p_ = -1, _i_ = (t).hashs[_h_];				\
+	while (_i_ > -1) {						\
+	    if (cmp(k, (t).keys[_i_])) {				\
+		(t).count -= 1;						\
+									\
+		_p_ = _i_;						\
+		_i_ = (t).nexts[_i_];					\
+		if (_i_ < 0) {						\
+		    goto _memwise__remove_;				\
+		} else {						\
+		    break;						\
+		}							\
+	    }								\
+	    _p_ = _i_; _i_ = (t).nexts[_p_];				\
+	}								\
+	break;								\
+									\
+    _memwise__remove_:							\
+	do {								\
+	    (t).nexts[_p_] = (t).nexts[_i_];				\
+	    (t).keys[_p_]  = (t).keys[_i_];				\
+	    (t).vals[_p_]  = (t).vals[_i_];				\
+									\
+	    _p_ = _i_;							\
+	    _i_ = (t).nexts[_i_];					\
+	} while (_i_ > -1);						\
+    } while (0)
 
 #if MEMWISE_C_VERSION || !defined(__cplusplus)
 /* BEGIN OF C VERSIONS */
@@ -1167,6 +1197,14 @@ bool table_has(const table_t<key_t, val_t>& table, const key_t& key)
     bool val;
     memwise__table_has(table, key, val, table_hash_f<key_t>, table_cmp_f<key_t>);
     return val;
+}
+
+template <typename key_t, typename val_t>
+bool table_remove(table_t<key_t, val_t>& table, const key_t& key)
+{
+    bool res;
+    memwise__table_remove(table, key, table_hash_f<key_t>, table_cmp_f<key_t>);
+    return res;
 }
 
 /* END OF C++ VERSIONS */
