@@ -1,12 +1,8 @@
 /* @warning: no header guards, no #pragma once */
 /*           'cause using like an template     */
 
-#ifdef ARRAY_CONFIG
-#undef ARRAY_CONFIG
-
-#define ARRAY__DEFINE(name) ARRAY__CONCAT(ARRAY_PREFIX, name)
-#define ARRAY__CONCAT(prefix, name) ARRAY__CONCAT_INTERNAL(prefix, name)
-#define ARRAY__CONCAT_INTERNAL(prefix, name) prefix ## name        
+#ifdef ARRAY_CLEAN
+#undef ARRAY_CLEAN
 
 #undef array_t
 #undef array_init         
@@ -31,6 +27,24 @@
 #undef array_erase       
 #undef array_remove      
 #undef array_right_remove
+
+#undef array_element_t
+#undef ARRAY_ELEMENT_EQUAL
+
+#undef ARRAY_API
+#undef ARRAY_IMPL
+#undef ARRAY_PREFIX
+
+#elif defined(ARRAY_CONFIG)
+#undef ARRAY_CONFIG
+
+/* clean up */
+#define ARRAY_CLEAN
+#include __FILE__
+
+#define ARRAY__DEFINE(name) ARRAY__CONCAT(ARRAY_PREFIX, name)
+#define ARRAY__CONCAT(prefix, name) ARRAY__CONCAT_INTERNAL(prefix, name)
+#define ARRAY__CONCAT_INTERNAL(prefix, name) prefix ## name        
 
 #define array_t            ARRAY__DEFINE(_t)
 #define array_init         ARRAY__DEFINE(_init)
@@ -72,11 +86,6 @@ typedef struct
 #define membuf_collect(buf, ptr)         (buf)->collect((buf)->data, ptr)
 #define membuf_extract(buf, size, align) (buf)->extract((buf)->data, size, align)
 #endif /* HAS_MEMBUF_T */
-
-#ifndef array_assert
-#include <assert.h>
-#define  array_assert(a, e) assert(e)
-#endif
 
 #ifndef __cplusplus
 # if __STDC_VERSION__ == 201112L
@@ -137,10 +146,15 @@ ARRAY_API bool array_right_remove(array_t* array, array_element_t element);
 
 #ifdef ARRAY_IMPL
 
+#ifndef array_assert
+#include <assert.h>
+#define  array_assert(a, e) assert(a != NULL); assert(e)
+#endif
+
 #include <string.h>
 
-#ifndef array_element_equal
-#define array_element_equal(a, b) ((a) == (b))
+#ifndef ARRAY_ELEMENT_EQUAL
+#define ARRAY_ELEMENT_EQUAL(a, b) ((a) == (b))
 #endif
 
 void array_init(array_t* array, membuf_t* membuffer)
@@ -250,7 +264,7 @@ int array_find(const array_t* array, array_element_t element)
     int index, count;
     for (index = 0, count = array->count; index < count; index++)
     {
-	if (array_element_equal(array->elements[index], element))
+	if (ARRAY_ELEMENT_EQUAL(array->elements[index], element))
 	{
 	    return index;
 	}
@@ -264,7 +278,7 @@ int array_rfind(const array_t* array, array_element_t element)
     int index;
     for (index = array->count - 1; index > -1; index--)
     {
-	if (array_element_equal(array->elements[index], element))
+	if (ARRAY_ELEMENT_EQUAL(array->elements[index], element))
 	{
 	    return index;
 	}

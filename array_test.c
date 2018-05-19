@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ARRAY_PREFIX intarr
 #define ARRAY_CONFIG
+#define ARRAY_PREFIX intarr
 #include "array.h"
 
 #define ARRAY_IMPL
