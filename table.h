@@ -28,6 +28,9 @@
 #define TABLE_CLEAN
 #include __FILE__
 
+#undef TABLE__DEFINE
+#undef TABLE__CONCAT
+#undef TABLE__CONCAT_IN
 #define TABLE__DEFINE(name) TABLE__CONCAT(TABLE_PREFIX, name)
 #define TABLE__CONCAT(prefix, name) TABLE__CONCAT_IN(prefix, name)
 #define TABLE__CONCAT_IN(prefix, name) prefix ## name

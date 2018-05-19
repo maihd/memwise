@@ -42,9 +42,12 @@
 #define ARRAY_CLEAN
 #include __FILE__
 
+#undef ARRAY__DEFINE
+#undef ARRAY__CONCAT
+#undef ARRAY__CONCAT_IN
 #define ARRAY__DEFINE(name) ARRAY__CONCAT(ARRAY_PREFIX, name)
-#define ARRAY__CONCAT(prefix, name) ARRAY__CONCAT_INTERNAL(prefix, name)
-#define ARRAY__CONCAT_INTERNAL(prefix, name) prefix ## name        
+#define ARRAY__CONCAT(prefix, name) ARRAY__CONCAT_IN(prefix, name)
+#define ARRAY__CONCAT_IN(prefix, name) prefix ## name        
 
 #define array_t            ARRAY__DEFINE(_t)
 #define array_init         ARRAY__DEFINE(_init)
