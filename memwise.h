@@ -45,7 +45,7 @@ typedef struct
 } membuf_t;
 
 #define membuf_collect(buf, ptr)  (buf)->collect((buf)->data, ptr)
-#define membuf_extract(buf, size) (buf)->extract((buf)->data, size, 1)
+#define membuf_extract(buf, size) (buf)->extract((buf)->data, size, 4)
 #endif
 
 /* --------------------------------------------------- */
