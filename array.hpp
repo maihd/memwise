@@ -6,6 +6,7 @@
 #endif
 
 #include <assert.h>
+#include <string.h>
 
 /* COPY FROM membuf.h */
 #ifndef HAS_MEMBUF_T
@@ -32,70 +33,80 @@ typedef struct
 template <typename type_t>
 union array_t /* union instead of other type for make sure there is no vtable */
 {   
-public: /* Property feature implement */
+public: /* @region: Property feature implement */
     template <typename T>
     union property
     {
-    public:
-	inline property(void)           : value()      {}
-	inline property(const T& value) : value(value) {}
+	public: /* @region: Constructors */
+		inline property(void)           : value()      {}
+		inline property(const T& value) : value(value) {}
 
-	inline operator const T&(void) const {
-	    return value; 
-	}
-	
-    private:
-	inline T& operator=(const T& other) {
-	    return (value = other);
-	}
-	
-    private:
-	T value;
-	friend array_t<type_t>;
+		inline operator const T&(void) const 
+		{
+			return value; 
+		}
+		
+	private: /* @region: Operator */
+		inline T& operator=(const T& other)
+		{
+			return (value = other);
+		}
+		
+	private: /* @region: Fields */
+		T value;
+
+	private: /* @region: Metadata */
+		friend array_t<type_t>;
     };
     
-public: /* Fields */
+public: /* @region: Fields */
     struct
     {
-	property<int>       count;
-	property<int>       capacity;
-	property<type_t*>   elements;
-	property<membuf_t*> membuffer;
+		property<int>       count;
+		property<int>       capacity;
+		property<type_t*>   elements;
+		property<membuf_t*> membuffer;
     };
     
-public:
+public: /* @region: Constructors */
     inline array_t(membuf_t* membuf)
-	: count(0)
-	, capacity(0)
-	, elements(0)
-	, membuffer(membuf)
-	{}
+		: count(0)
+		, capacity(0)
+		, elements(0)
+		, membuffer(membuf)
+		{}
     
-    inline ~array_t(void) {
-	membuf_collect((membuf_t*)membuffer, elements);
-	
-	count     = 0;
-	capacity  = 0;
-	elements  = 0;
-	membuffer = 0;
+    inline ~array_t(void) 
+	{
+		membuf_collect((membuf_t*)membuffer, elements);
+		
+		count     = 0;
+		capacity  = 0;
+		elements  = 0;
+		membuffer = 0;
     }
 
-    inline type_t& operator[](int index) {
-	assert(index >= 0 && index < count);
-	return elements[index];
+public: /* @region: Operators */
+    inline type_t& operator[](int index)
+	{
+		assert(index >= 0 && index < count);
+		return elements[index];
     }
     
-    inline const type_t& operator[](int index) const {
-	assert(index >= 0 && index < count);
-	return elements[index];
+    inline const type_t& operator[](int index) const
+	{
+		assert(index >= 0 && index < count);
+		return elements[index];
     }
 
-    inline operator type_t*(void) {
-	return elements;
+    inline operator type_t*(void) 
+	{
+		return elements;
     }
     
-    inline operator const type_t*(void) const {
-	return elements;
+    inline operator const type_t*(void) const 
+	{
+		return elements;
     }
 };
 
@@ -104,79 +115,213 @@ namespace array
     template <typename type_t>
     inline bool expand(array_t<type_t>& array, int capacity)
     {
-	if (array.capacity < capacity)
-	{
-	    int new_capacity = array.capacity > 0 ? (int)array.capacity : 64;
-	    while (new_capacity < capacity)
-	    {
-		new_capacity *= 2;
-	    }
+		if (array.capacity < capacity)
+		{
+			int new_capacity = array.capacity > 0 ? (int)array.capacity : 64;
+			while (new_capacity < capacity)
+			{
+				new_capacity *= 2;
+			}
 
-	    *((int*)&array.capacity)     = new_capacity;
-	    *((type_t**)&array.elements) =
-		(type_t*)membuf_resize((membuf_t*)array.membuffer,
-				       array.elements,
-				       new_capacity * sizeof(type_t), 4);
-	    return array.elements != NULL;
-	}
-	else
-	{
-	    return true;
-	}
+			*((int*)&array.capacity)     = new_capacity;
+			*((type_t**)&array.elements) =
+				(type_t*)membuf_resize((membuf_t*)array.membuffer,
+							array.elements,
+							new_capacity * sizeof(type_t), 4);
+			return array.elements != NULL;
+		}
+		else
+		{
+			return true;
+		}
     }
     
     template <typename type_t>
     inline bool ensure(array_t<type_t>& array, int capacity)
     {
-	if (array.capacity < capacity)
-	{
-	    return expand(array, capacity);
-	}
-	else
-	{
-	    return true;
-	}
+		if (array.capacity < capacity)
+		{
+			return expand(array, capacity);
+		}
+		else
+		{
+			return true;
+		}
     }
 
     template <typename type_t>
     inline bool set(array_t<type_t>& array, int index, const type_t& value)
     {
-	if (index >= array.count)
-	{
-	    *((int*)&array.count) = index + 1;
-	}
-	
-	if (ensure(array, array.count))
-	{
-	    array[index] = value;
-	    return true;
-	}
-	else
-	{
-	    return false;
-	}
+		if (index >= array.count)
+		{
+			*((int*)&array.count) = index + 1;
+		}
+		
+		if (ensure(array, array.count))
+		{
+			array[index] = value;
+			return true;
+		}
+		else
+		{
+			return false;
+		}
     }
 
     template <typename type_t>
     inline const type_t& get(const array_t<type_t>& array, int index)
     {
-	assert(index >= 0 && index < array.count);
-	return array.elements[index];
+		assert(index >= 0 && index < array.count);
+		return array.elements[index];
     }
 
     template <typename type_t>
     inline bool push(array_t<type_t>& array, type_t value)
     {
-	return set(array, array.count, value);
+		return set(array, array.count, value);
     }
 
     template <typename type_t>
     inline const type_t& pop(array_t<type_t>& array)
     {
-	assert(array.count > 0);
-	*((int*)&array.count) = array.count - 1;
-	return array.elements[array.count];
+		assert(array.count > 0);
+		*((int*)&array.count) = array.count - 1;
+		return array.elements[array.count];
     }
+
+	template <typename type_t>
+	int find(const array_t<type_t>& array, const type_t& element)
+	{
+		int index, count;
+		for (index = 0, count = array.count; index < count; index++)
+		{
+			if (array.elements[index] == element)
+			{
+				return index;
+			}
+		}
+
+		return -1;
+	}
+
+	template <typename type_t>
+	int rfind(const array_t<type_t>& array, const type_t& element)
+	{
+		int index;
+		for (index = array.count - 1; index > -1; index--)
+		{
+			if (array.elements[index] == element)
+			{
+				return index;
+			}
+		}
+
+		return -1;
+	}
+
+	template <typename type_t>
+	inline bool has(const array_t<type_t>& array, const type_t& element)
+	{
+		return find(array, element) > -1;
+	}
+
+	template <typename type_t>
+	bool insert(array_t<type_t>& array, int index, const type_t& element)
+	{
+		if (index >= array.count)
+		{
+			return set(array, index, element);
+		}
+		else
+		{
+			if (array_ensure(array, array.count + 1))
+			{
+				int   copy_cnt = array.count - index - 1;
+				void* copy_src = array.elements + index;
+				void* copy_dst = array.elements + index + 1;
+				memmove(copy_dst, copy_src, copy_cnt * sizeof(type_t));
+				
+				array[index] = element; 
+			}
+			else
+			{
+				return false;
+			}
+		}
+	}
+
+	template <typename type_t>
+	inline bool unshift(array_t<type_t>& array, const type_t& element)
+	{
+		return insert(array, 0, element);
+	}
+
+	template <typename type_t>
+	inline type_t shift(array_t<type_t>& array)
+	{
+		assert(array.count > 0);
+		
+		type_t res = array.elements[0];
+
+		erase(array, 0);
+		
+		return res;
+	}
+
+	template <typename type_t>
+	inline bool erase(array_t<type_t>& array, int index)
+	{
+		if (index < 0 || index >= array.count)
+		{
+			return false;
+		}
+		else
+		{
+			*((int*)&array.count) = array.count--;
+		
+			if (index < array.count)
+			{
+				int   copy_cnt = array.count - index;
+				void* copy_src = array.elements + index + 1;
+				void* copy_dst = array.elements + index;
+				memcpy(copy_dst, copy_src, copy_cnt * sizeof(type_t));
+			}
+
+			return true;
+		}
+	}
+
+	template <typename type_t>
+	inline bool remove(array_t<type_t>& array, const type_t& element)
+	{
+		int index = find(array, element);
+
+		if (index > -1)
+		{
+			(void)erase(array, index); /* ignore return value */
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	template <typename type_t>
+	inline bool right_remove(array_t<type_t>& array, const type_t& element)
+	{
+		int index = rfind(array, element);
+
+		if (index > -1)
+		{
+			(void)erase(array, index); /* ignore return value */
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
 };
 
 #endif

@@ -156,7 +156,7 @@
 			    _MGENSYM(_a_))
 
 
-#if MEMWISE_C_VERSION || !defined(__cplusplus)
+#if defined(MEMWISE_C_VERSION) || !defined(__cplusplus)
 /* BEGIN OF C VERSIONS */
 
 
@@ -194,102 +194,117 @@
 #define tempo_insert(t, i, e) memwise__tempo_insert(t, i, e)
 
 #else
+
 /**
  * Temporary array
  */
 template <typename type_t, int capacity>
 struct tempo_t
 {
+public: /* @region: Fields */
     memwise__tempo_t(type_t, capacity);
 
+public: /* @region: Constructors */
+    inline tempo_t(void)
+    {
+        memwise__tempo_init(*this);
+    }
+
+public: /* @region: Operators */
     inline type_t& operator[](int index)
     {
-	return elements[index];
+	    return elements[index];
     }
 
     inline const type_t& operator[](int index) const
     {
-	return elements[index];
+	    return elements[index];
+    }
+
+    inline operator type_t*(void)
+    {
+        return elements;
+    }
+
+    inline operator const type_t*(void) const
+    {
+        return elements;
     }
 };
 
-template <typename type_t, int capacity>
-inline void tempo_init(tempo_t<type_t, capacity>& tempo)
+namespace tempo
 {
-    memwise__tempo_init(tempo);
-}
+    template <typename type_t, int capacity>
+    void set(tempo_t<type_t, capacity>& tempo, int index, const type_t& value)
+    {
+        memwise__tempo_set(tempo, index, value);
+    }
 
-template <typename type_t, int capacity>
-void tempo_set(tempo_t<type_t, capacity>& tempo, int index, const type_t& value)
-{
-    memwise__tempo_set(tempo, index, value);
-}
+    template <typename type_t, int capacity>
+    inline const type_t& get(const tempo_t<type_t, capacity>& tempo, int index)
+    {
+        return memwise__tempo_get(tempo, index);
+    }
 
-template <typename type_t, int capacity>
-inline const type_t& tempo_get(const tempo_t<type_t, capacity>& tempo, int index)
-{
-    return memwise__tempo_get(tempo, index);
-}
+    template <typename type_t, int capacity>
+    inline type_t* ref(tempo_t<type_t, capacity>& tempo, int index)
+    {
+        return memwise__tempo_ref(tempo, index);
+    }
 
-template <typename type_t, int capacity>
-inline type_t* tempo_ref(tempo_t<type_t, capacity>& tempo, int index)
-{
-    return memwise__tempo_ref(tempo, index);
-}
+    template <typename type_t, int capacity>
+    inline const type_t* ref(const tempo_t<type_t, capacity>& tempo, int index)
+    {
+        return memwise__tempo_ref(tempo, index);
+    }
 
-template <typename type_t, int capacity>
-inline const type_t* tempo_ref(const tempo_t<type_t, capacity>& tempo, int index)
-{
-    return memwise__tempo_ref(tempo, index);
-}
+    template <typename type_t, int capacity>
+    inline const type_t& pop(tempo_t<type_t, capacity>& tempo)
+    {
+        return memwise__tempo_pop(tempo);
+    }
 
-template <typename type_t, int capacity>
-inline const type_t& tempo_pop(tempo_t<type_t, capacity>& tempo)
-{
-    return memwise__tempo_pop(tempo);
-}
+    template <typename type_t, int capacity>
+    inline void push(tempo_t<type_t, capacity>& tempo, const type_t& value)
+    {
+        tempo_set(tempo, value);
+    }
 
-template <typename type_t, int capacity>
-inline void tempo_push(tempo_t<type_t, capacity>& tempo, const type_t& value)
-{
-    tempo_set(tempo, value);
-}
+    template <typename type_t, int capacity>
+    int find(const tempo_t<type_t, capacity>& tempo, const type_t& value)
+    {
+        int res;
+        memwise__tempo_find(tempo, value, res);
+        return res;
+    }
 
-template <typename type_t, int capacity>
-int tempo_find(const tempo_t<type_t, capacity>& tempo, const type_t& value)
-{
-    int res;
-    memwise__tempo_find(tempo, value, res);
-    return res;
-}
+    template <typename type_t, int capacity>
+    int rfind(const tempo_t<type_t, capacity>& tempo, const type_t& value)
+    {
+        int res;
+        memwise__tempo_rfind(tempo, value, res);
+        return res;
+    }
 
-template <typename type_t, int capacity>
-int tempo_rfind(const tempo_t<type_t, capacity>& tempo, const type_t& value)
-{
-    int res;
-    memwise__tempo_rfind(tempo, value, res);
-    return res;
-}
+    template <typename type_t, int capacity>
+    void erase(tempo_t<type_t, capacity>& tempo, int index)
+    {
+        memwise__tempo_erase(tempo, index);
+    }
 
-template <typename type_t, int capacity>
-void tempo_erase(tempo_t<type_t, capacity>& tempo, int index)
-{
-    memwise__tempo_erase(tempo, index);
-}
-
-template <typename type_t, int capacity>
-void tempo_remove(tempo_t<type_t, capacity>& tempo, const type_t& value)
-{
-    memwise__tempo_remove(tempo, value);
-}
+    template <typename type_t, int capacity>
+    void remove(tempo_t<type_t, capacity>& tempo, const type_t& value)
+    {
+        memwise__tempo_remove(tempo, value);
+    }
 
 
-template <typename type_t, int capacity>
-void tempo_insert(tempo_t<type_t, capacity>& tempo,
-		  int index,
-		  const type_t& value)
-{
-    memwise__tempo_insert(tempo, index, value);
+    template <typename type_t, int capacity>
+    void insert(tempo_t<type_t, capacity>& tempo, int index, const type_t& value)
+    {
+        memwise__tempo_insert(tempo, index, value);
+    }
 }
 #endif /* MEMWISE_C_VERSIONS */
+
 #endif /* __TEMPO_H__ */
