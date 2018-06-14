@@ -1,7 +1,7 @@
 /* @warning: no header guards, no #pragma once */
 /*           'cause using like an template     */
 
-#ifdef ARRAY_CLEAN
+#if defined(ARRAY_CLEAN)
 #undef ARRAY_CLEAN
 
 #undef array_t
@@ -38,15 +38,16 @@
 #elif defined(ARRAY_CONFIG)
 #undef ARRAY_CONFIG
 
-/* clean up */
+#if defined(ARRAY__SHOULD_CLEAN)
 #define ARRAY_CLEAN
 #include __FILE__
+#endif
 
 #undef ARRAY__DEFINE
 #undef ARRAY__CONCAT
 #undef ARRAY__CONCAT_IN
-#define ARRAY__DEFINE(name) ARRAY__CONCAT(ARRAY_PREFIX, name)
-#define ARRAY__CONCAT(prefix, name) ARRAY__CONCAT_IN(prefix, name)
+#define ARRAY__DEFINE(name)            ARRAY__CONCAT(ARRAY_PREFIX, name)
+#define ARRAY__CONCAT(prefix, name)    ARRAY__CONCAT_IN(prefix, name)
 #define ARRAY__CONCAT_IN(prefix, name) prefix ## name        
 
 #define array_t            ARRAY__DEFINE(_t)
@@ -72,8 +73,12 @@
 #define array_erase        ARRAY__DEFINE(_erase)
 #define array_remove       ARRAY__DEFINE(_remove)
 #define array_right_remove ARRAY__DEFINE(_right_remove)
+
+#define ARRAY__SHOULD_CLEAN
+
 #else
 
+/* COPY FROM membuf.h */
 #ifndef HAS_MEMBUF_T
 #define HAS_MEMBUF_T
 /**
@@ -82,10 +87,15 @@
 typedef struct
 {
     void* data;
+
+    void  (*clear)(void* data);
+    void* (*resize)(void* data, void* ptr, int size, int align);
     void  (*collect)(void* data, void* pointer);
     void* (*extract)(void* data, int size, int align);
 } membuf_t;
 
+#define membuf_clear(buf)                (buf)->clear((buf)->data)
+#define membuf_resize(buf, ptr, s, a)    (buf)->resize((buf)->data, ptr, s, a)
 #define membuf_collect(buf, ptr)         (buf)->collect((buf)->data, ptr)
 #define membuf_extract(buf, size, align) (buf)->extract((buf)->data, size, align)
 #endif /* HAS_MEMBUF_T */
@@ -192,20 +202,16 @@ bool array_ensure(array_t* array, int capacity)
 
 bool array_resize(array_t* array, int capacity)
 {
-    /* save old array->elements memory's size for memcpy */
-    const int old_size = array->capacity * sizeof(array_element_t);
-
     /* calculate new array capacity to fit expected capacity */
     if (array->capacity <= 0) array->capacity = capacity;
     while (array->capacity < capacity)
     {
 	array->capacity *= 2;
     }
+    
     const int new_size = array->capacity * sizeof(array_element_t);
-
-    array_element_t* old_elements = array->elements;
-    array_element_t* new_elements = 
-	(array_element_t*)membuf_extract(array->membuffer, new_size, 4);
+    void* new_elements = membuf_resize(array->membuffer,
+				       array->elements, new_size, 4);
 
     if (!new_elements)
     {
@@ -213,10 +219,7 @@ bool array_resize(array_t* array, int capacity)
     }
     else
     {
-	memcpy(new_elements, old_elements, old_size);
-	membuf_collect(array->membuffer, old_elements);
-	    
-	array->elements = new_elements;
+	array->elements = (array_element_t*)new_elements;
 	return true;
     }
 }

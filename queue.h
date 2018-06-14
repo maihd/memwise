@@ -1,8 +1,21 @@
 #if defined(QUEUE_CLEAN)
 #undef QUEUE_CLEAN
 
+#undef queue_t
+#undef queue_init
+#undef queue_free
+#undef queue_peek
+#undef queue_enque
+#undef queue_deque
+
 #elif defined(QUEUE_CONFIG)
 #undef QUEUE_CONFIG
+
+#if defined(QUEUE__SHOULD_CLEAN)
+#undef  QUEUE__SHOULD_CLEAN
+#define QUEUE_CLEAN
+#include __FILE__
+#endif
 
 #undef QUEUE__DEFINE
 #undef QUEUE__CONCAT
@@ -18,8 +31,11 @@
 #define queue_enque QUEUE__DEFINE(_enque)
 #define queue_deque QUEUE__DEFINE(_deque)
 
+#define QUEUE__SHOULD_CLEAN
+
 #else
 
+/* COPY FROM membuf.h */
 #ifndef HAS_MEMBUF_T
 #define HAS_MEMBUF_T
 /**
@@ -28,10 +44,15 @@
 typedef struct
 {
     void* data;
+
+    void  (*clear)(void* data);
+    void* (*resize)(void* data, void* ptr, int size, int align);
     void  (*collect)(void* data, void* pointer);
     void* (*extract)(void* data, int size, int align);
 } membuf_t;
 
+#define membuf_clear(buf)                (buf)->clear((buf)->data)
+#define membuf_resize(buf, ptr, s, a)    (buf)->resize((buf)->data, ptr, s, a)
 #define membuf_collect(buf, ptr)         (buf)->collect((buf)->data, ptr)
 #define membuf_extract(buf, size, align) (buf)->extract((buf)->data, size, align)
 #endif /* HAS_MEMBUF_T */
@@ -132,18 +153,14 @@ bool queue_enque(queue_t* queue, queue_element_t element)
 	}
 	else
 	{
-	    const int old_size = queue->capacity * sizeof(queue_element_t);
 	    if (queue->capacity <= 0) queue->capacity  = QUEUE_CAPACITY;
 	    else                      queue->capacity *= 2;
+	    
 	    const int new_size = queue->capacity * sizeof(queue_element_t);
-
-	    void* old_data = queue->elements;
-	    void* new_data = membuf_extract(queue->membuffer, new_size, 4);
+	    void* new_elements = membuf_resize(queue->membuffer,
+					       queue->elements, new_size, 4);
 	    if (new_data)
 	    {
-		memcpy(new_data, old_data, old_size);
-		membuf_collect(queue->membuffer, old_data);
-
 		queue->elements = (queue_element_t*)new_data;
 	    }
 	    else

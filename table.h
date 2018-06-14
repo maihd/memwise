@@ -25,8 +25,11 @@
 #elif defined(TABLE_CONFIG)
 #undef TABLE_CONFIG
 
+#if defined(TABLE__SHOULD_CLEAN)
+#undef  TABLE__SHOULD_CLEAN
 #define TABLE_CLEAN
 #include __FILE__
+#endif
 
 #undef TABLE__DEFINE
 #undef TABLE__CONCAT
@@ -44,8 +47,11 @@
 #define table_set     TABLE__DEFINE(_set)
 #define table_remove  TABLE__DEFINE(_remove)
 
+#define TABLE__SHOULD_CLEAN
+
 #else
 
+/* COPY FROM membuf.h */
 #ifndef HAS_MEMBUF_T
 #define HAS_MEMBUF_T
 /**
@@ -54,10 +60,15 @@
 typedef struct
 {
     void* data;
+
+    void  (*clear)(void* data);
+    void* (*resize)(void* data, void* ptr, int size, int align);
     void  (*collect)(void* data, void* pointer);
     void* (*extract)(void* data, int size, int align);
 } membuf_t;
 
+#define membuf_clear(buf)                (buf)->clear((buf)->data)
+#define membuf_resize(buf, ptr, s, a)    (buf)->resize((buf)->data, ptr, s, a)
 #define membuf_collect(buf, ptr)         (buf)->collect((buf)->data, ptr)
 #define membuf_extract(buf, size, align) (buf)->extract((buf)->data, size, align)
 #endif /* HAS_MEMBUF_T */

@@ -1,7 +1,6 @@
 #ifndef __TEMPO_H__
 #define __TEMPO_H__
 
-
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,21 +31,7 @@
 /* ----------------- MEMORY BUFFER ----------------- */
 /* ------------------------------------------------- */
 
-#ifndef HAS_MEMBUF_T
-#define HAS_MEMBUF_T
-/**
- * Memory buffer
- */
-typedef struct
-{
-    void* data;
-    void  (*collect)(void* data, void* pointer);
-    void* (*extract)(void* data, int size, int align);
-} membuf_t;
-
-#define membuf_collect(buf, ptr)  (buf)->collect((buf)->data, ptr)
-#define membuf_extract(buf, size) (buf)->extract((buf)->data, size, 4)
-#endif
+/* NO MEMORY BUFFER NEEDED, tempo_t doesnot use dynamic memory allocation */
 
 /* --------------------------------------------------- */
 /* ------------------- CONTAINERS -------------------- */

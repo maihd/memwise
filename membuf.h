@@ -1,4 +1,4 @@
-/***************************
+/**************************************************************************
  * Memory buffer is a buffer that contains memory
  * and a manager for allocation/deallocation
  *
@@ -13,7 +13,7 @@
  *      + one-frame, two-frame temporary
  *      + double-buffered I/O
  *      + general purpose (get memory directly from heap, membuf_heap())
- ***************************/
+ *************************************************************************/
 
 #ifndef __MEMBUF_H__
 #define __MEMBUF_H__
@@ -26,10 +26,15 @@
 typedef struct
 {
     void* data;
+
+    void  (*clear)(void* data);
+    void* (*resize)(void* data, void* ptr, int size, int align);
     void  (*collect)(void* data, void* pointer);
     void* (*extract)(void* data, int size, int align);
 } membuf_t;
 
+#define membuf_clear(buf)                (buf)->clear((buf)->data)
+#define membuf_resize(buf, ptr, s, a)    (buf)->resize((buf)->data, ptr, s, a)
 #define membuf_collect(buf, ptr)         (buf)->collect((buf)->data, ptr)
 #define membuf_extract(buf, size, align) (buf)->extract((buf)->data, size, align)
 #endif
@@ -48,6 +53,7 @@ MEMBUF_API membuf_t* membuf_new_stack(int size);
 MEMBUF_API membuf_t* membuf_new_linear(int size);
 MEMBUF_API membuf_t* membuf_new_destack(int size);
 MEMBUF_API membuf_t* membuf_new_pool(int count, int block);
+
 MEMBUF_API void      membuf_free(membuf_t* buf);
 
 #endif /* __MEMWISE_MEMBUF_H__ */
@@ -55,11 +61,7 @@ MEMBUF_API void      membuf_free(membuf_t* buf);
 #ifdef MEMBUF_IMPL
 
 #include <stdlib.h>
-#if defined(__unix__) || defined(__APPLE__)
-#include <unistd.h>
-#elif defined(_WIN32)
-#include <Windows.h>
-#endif
+#include <assert.h>
 
 typedef struct
 {
@@ -88,6 +90,9 @@ typedef struct
     int tail;
 } destackbuf_t;
 
+/*********************************
+ * @region: Constructors
+ *********************************/
 membuf_t* membuf_new_linear(int size)
 {
     int real_size = sizeof(membuf_t) + sizeof(linearbuf_t) + size;
@@ -151,43 +156,73 @@ void membuf_free(membuf_t* buf)
     free(buf);
 }
 
+/****************************************
+ * @region: Functions implement
+ ****************************************/
+static void  membuf_heap_clear(void* data)
+{
+    (void)data;
+}
+
+static void* membuf_heap_extract(void* data, int size, int align);
+static void* membuf_heap_resize(void* data, void* ptr, int size, int align)
+{
+    (void)data;
+    (void)align;
+
+    if (ptr)
+    {
+	int misalign = *((unsigned char*)ptr - 1);
+	void* res = realloc(ptr - misalign, size + align);
+	if (res)
+	{
+	    misalign = (int)((intptr_t)res & align);
+	    
+	    res += misalign;
+	    *((unsigned char*)res - 1) = misalign;
+	}
+	return res;
+    }
+    else
+    {
+	return membuf_heap_extract(NULL, size, align);
+    }
+}
+
 static void* membuf_heap_extract(void* data, int size, int align)
 {
     (void)data;
     (void)align;
+
+    assert(align > 1 && align <= 256);
     
-#if defined(__unix__) || defined(__APPLE__)
-    void* ptr = malloc(size);
-    if (posix_memalign(&ptr, align, size) != 0)
+    void* res = malloc(size + align);
+    if (res)
     {
-	free(ptr);
-	return NULL;
+	int misalign = (int)((intptr_t)res & align);
+	
+	res += misalign;
+	*((unsigned char*)res - 1) = misalign;
     }
-    else
-    {
-	return ptr;
-    }
-#elif defined(_WIN32)
-    return _aligned_malloc(size, align);
-#else
-    return malloc(size);
-#endif
+    return res;
 }
 
 static void  membuf_heap_collect(void* data, void* pointer)
 {
     (void)data;
 
-#if defined(_WIN32)
-    _align_free(pointer);
-#else
-    free(pointer);
-#endif
+    if (pointer)
+    {
+	int misalign = *((unsigned char*)pointer - 1);
+	free(pointer - misalign);
+    }
 }
 
 static membuf_t membuf__heap =
 {
     NULL,
+    membuf_heap_clear,
+    membuf_heap_resize,
     membuf_heap_collect,
     membuf_heap_extract,
 };
@@ -195,6 +230,33 @@ static membuf_t membuf__heap =
 membuf_t* membuf_heap(void)
 {
     return &membuf__heap;
+}
+
+static void membuf_linear_clear(void* userdata)
+{
+    linearbuf_t* buf = (linearbuf_t*)userdata;
+    buf->tail = 0;
+}
+
+static void* membuf_linear_extract(void* userdata, int size, int align);
+static void* membuf_linear_resize(void* userdata, void* ptr, int size, int align)
+{
+    linearbuf_t* buf = (linearbuf_t*)userdata;
+    intptr_t address = (intptr_t)ptr - (intptr_t)userdata;
+    if (address > 0 && address + size <= buf->tail)
+    {
+	buf->tail = buf->tail > address + size ? buf->tail : address + size;
+	return ptr;
+    }
+    else
+    {
+	void* res = membuf_linear_extract(userdata, size, align);
+	if (ptr && res)
+	{
+	    memcpy(res, ptr, size);
+	}
+	return res;
+    }
 }
 
 static void* membuf_linear_extract(void* userdata, int size, int align)
@@ -215,8 +277,6 @@ static void* membuf_linear_extract(void* userdata, int size, int align)
 
 static void  membuf_linear_collect(void* userdata, void* ptr)
 {
-    (void)ptr;
-    
     linearbuf_t* buf = (linearbuf_t*)userdata;
     intptr_t address = (intptr_t)ptr - (intptr_t)userdata;
     if (address > 0 && address < buf->tail)
@@ -234,15 +294,41 @@ membuf_t* membuf_linear(void* data, int size)
     else
     {
 	membuf_t* buf = (membuf_t*)data;
-	buf->data = (void*)((char*)data + sizeof(membuf_t));
-	buf->extract = membuf_linear_extract;
-	buf->collect = membuf_linear_collect;
+	buf->data     = (void*)((char*)data + sizeof(membuf_t));
+	buf->clear    = membuf_linear_clear;
+	buf->resize   = membuf_linear_resize;
+	buf->extract  = membuf_linear_extract;
+	buf->collect  = membuf_linear_collect;
 
 	linearbuf_t* ldata = (linearbuf_t*)buf->data;
 	ldata->tail = 0;
 	ldata->size = size - sizeof(membuf_t) - sizeof(linearbuf_t);
 	
 	return buf;
+    }
+}
+
+static void  membuf_stack_clear(void* userdata)
+{
+    stackbuf_t* buf = (stackbuf_t*)userdata;
+
+    buf->tail = 0;
+}
+
+static void* membuf_stack_extract(void* userdata, int size, int align);
+static void* membuf_stack_resize(void* userdata, void* ptr, int size, int align)
+{
+    stackbuf_t* buf = (stackbuf_t*)userdata;
+    intptr_t address = (intptr_t)ptr - (intptr_t)userdata;
+    if (buf->tail > -1 && address == buf->tail + sizeof(int))
+    {
+	int* next = (int*)((char*)ptr - sizeof(int));
+	*next = size;
+	return ptr;
+    }
+    else
+    {
+	return membuf_stack_extract(userdata, size, align);
     }
 }
 
@@ -311,9 +397,11 @@ membuf_t* membuf_stack(void* data, int size)
     else
     {
 	membuf_t* buf = (membuf_t*)data;
-	buf->data = (void*)((char*)data + sizeof(membuf_t));
-	buf->extract = membuf_stack_extract;
-	buf->collect = membuf_stack_collect;
+	buf->data     = (void*)((char*)data + sizeof(membuf_t));
+	buf->clear    = membuf_stack_clear;
+	buf->resize   = membuf_stack_resize;
+	buf->extract  = membuf_stack_extract;
+	buf->collect  = membuf_stack_collect;
 
 	stackbuf_t* sdata = (stackbuf_t*)buf->data;
 	sdata->tail = -1;
@@ -323,15 +411,39 @@ membuf_t* membuf_stack(void* data, int size)
     }
 }
 
+static void  membuf_destack_clear(void* userdata)
+{
+    destackbuf_t* buf = (destackbuf_t*)userdata;
+
+    buf->head = 0;
+    buf->tail = 0;
+}
+
+static void* membuf_destack_resize(void* userdata, void* ptr, int size, int align)
+{
+    destackbuf_t* buf = (destackbuf_t*)userdata;
+
+    (void)ptr;
+    (void)size;
+    (void)align;
+
+    return NULL;
+}
+
 static void* membuf_destack_extract(void* userdata, int size, int align)
 {
     destackbuf_t* buf = (destackbuf_t*)userdata;
+
+    (void)size;
+    (void)align;
+    
+    return NULL;
 }
 
 static void  membuf_destack_collect(void* userdata, void* ptr)
 {
     destackbuf_t* buf = (destackbuf_t*)userdata;
-    intptr_t address = (intptr_t)ptr - (intptr_t)userdata;
+    intptr_t address  = (intptr_t)ptr - (intptr_t)userdata;
     if (buf->tail > -1 && address == buf->tail + sizeof(int))
     {
     }
@@ -349,9 +461,11 @@ membuf_t* membuf_destack(void* data, int size)
     else
     {
 	membuf_t* buf = (membuf_t*)data;
-	buf->data = (void*)((char*)data + sizeof(membuf_t));
-	buf->extract = membuf_destack_extract;
-	buf->collect = membuf_destack_collect;
+	buf->data     = (void*)((char*)data + sizeof(membuf_t));
+	buf->clear    = membuf_destack_clear;
+	buf->resize   = membuf_destack_resize;
+	buf->extract  = membuf_destack_extract;
+	buf->collect  = membuf_destack_collect;
 
 	destackbuf_t* userdata = (destackbuf_t*)buf->data;
 	userdata->tail = 0;
@@ -360,6 +474,21 @@ membuf_t* membuf_destack(void* data, int size)
 	
 	return buf;
     }
+}
+
+static void  membuf_pool_clear(void* userdata)
+{
+    (void)userdata;
+}
+
+static void* membuf_pool_resize(void* userdata, void* ptr, int size, int align)
+{
+    (void)userdata;
+    (void)ptr;
+    (void)size;
+    (void)align;
+
+    return NULL;
 }
 
 static void* membuf_pool_extract(void* userdata, int size, int align)
@@ -402,9 +531,11 @@ membuf_t* membuf_pool(void* data, int size, int block)
     else
     {
 	membuf_t* buf = (membuf_t*)data;
-	buf->data = (void*)((char*)data + sizeof(membuf_t));
-	buf->extract = membuf_pool_extract;
-	buf->collect = membuf_pool_collect;
+	buf->data     = (void*)((char*)data + sizeof(membuf_t));
+	buf->clear    = membuf_pool_clear;
+	buf->resize   = membuf_pool_resize;
+	buf->extract  = membuf_pool_extract;
+	buf->collect  = membuf_pool_collect;
 
 	poolbuf_t* userdata = (poolbuf_t*)buf->data;
 	userdata->size  = size - sizeof(membuf_t) - sizeof(poolbuf_t);

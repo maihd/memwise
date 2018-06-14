@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MEMBUF_IMPL
+#include "membuf.h"
+
 #define ARRAY_CONFIG
 #define ARRAY_PREFIX intarr
 #include "array.h"
@@ -10,28 +13,12 @@
 #define array_element_t int
 #include "array.h"
 
-void* membuf_default_extract(void* data, int size, int align)
-{
-    (void)data;
-    (void)align;
-    return malloc(size);
-}
-
-void membuf_default_collect(void* data, void* pointer)
-{
-    (void)data;
-    free(pointer);
-}
-
 int main(int argc, char* argv[])
 {
-    membuf_t membuf_default;
-    membuf_default.data = NULL;
-    membuf_default.collect = membuf_default_collect;
-    membuf_default.extract = membuf_default_extract;
+    membuf_t* heap = membuf_heap();
     
     intarr_t arr;
-    intarr_init(&arr, &membuf_default);
+    intarr_init(&arr, heap);
 
     printf("Add 10 elements has value from '1' to '10'\n");
     intarr_push(&arr, 1);
