@@ -62,6 +62,7 @@ MEMBUF_API void      membuf_free(membuf_t* buf);
 
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 
 typedef struct
 {
@@ -173,12 +174,12 @@ static void* membuf_heap_resize(void* data, void* ptr, int size, int align)
     if (ptr)
     {
 	int misalign = *((unsigned char*)ptr - 1);
-	void* res = realloc(ptr - misalign, size + align);
+	void* res = realloc((char*)ptr - misalign, size + align);
 	if (res)
 	{
 	    misalign = (int)((intptr_t)res & align);
 	    
-	    res += misalign;
+	    res = (char*)res + misalign;
 	    *((unsigned char*)res - 1) = misalign;
 	}
 	return res;
@@ -201,7 +202,7 @@ static void* membuf_heap_extract(void* data, int size, int align)
     {
 	int misalign = (int)((intptr_t)res & align);
 	
-	res += misalign;
+	res = (char*)res + misalign;
 	*((unsigned char*)res - 1) = misalign;
     }
     return res;
@@ -214,7 +215,7 @@ static void  membuf_heap_collect(void* data, void* pointer)
     if (pointer)
     {
 	int misalign = *((unsigned char*)pointer - 1);
-	free(pointer - misalign);
+	free((char*)pointer - misalign);
     }
 }
 
@@ -515,7 +516,7 @@ static void  membuf_pool_collect(void* userdata, void* ptr)
     intptr_t address = (intptr_t)ptr - (intptr_t)userdata;
     if (address > 0 && address < buf->size)
     {
-	void** block = (void**)(ptr - sizeof(void*));
+	void** block = (void**)((char*)ptr - sizeof(void*));
 	*block = buf->first;
 	buf->first = block;
 	buf->count = buf->count + 1;
