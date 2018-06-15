@@ -33,10 +33,37 @@ typedef struct
     void* (*extract)(void* data, int size, int align);
 } membuf_t;
 
-#define membuf_clear(buf)                (buf)->clear((buf)->data)
-#define membuf_resize(buf, ptr, s, a)    (buf)->resize((buf)->data, ptr, s, a)
-#define membuf_collect(buf, ptr)         (buf)->collect((buf)->data, ptr)
-#define membuf_extract(buf, size, align) (buf)->extract((buf)->data, size, align)
+#ifndef __cplusplus
+#  if __GNUC__
+#    define inline __inline__
+#  elif defined(_MSC_VER)
+#    define inline __inline
+#  else
+#    define inline
+#  endif
+#endif 
+
+static inline void membuf_clear(membuf_t* buf)
+{
+    buf->clear(buf->data);
+}
+
+static inline void* membuf_resize(membuf_t* buf, void* ptr, int size, int align)
+{
+    return buf->resize(buf->data, ptr, size, align);
+}
+
+static inline void membuf_collect(membuf_t* buf, void* ptr)
+{
+    buf->collect(buf->data, ptr);
+}
+
+static inline void* membuf_extract(membuf_t* buf, int size, int align)
+{
+    return buf->extract(buf->data, size, align);
+}
+
+/* END OF HAS_MEMBUF_T */
 #endif
 
 #ifndef MEMBUF_API

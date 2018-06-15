@@ -67,11 +67,38 @@ typedef struct
     void* (*extract)(void* data, int size, int align);
 } membuf_t;
 
-#define membuf_clear(buf)                (buf)->clear((buf)->data)
-#define membuf_resize(buf, ptr, s, a)    (buf)->resize((buf)->data, ptr, s, a)
-#define membuf_collect(buf, ptr)         (buf)->collect((buf)->data, ptr)
-#define membuf_extract(buf, size, align) (buf)->extract((buf)->data, size, align)
-#endif /* HAS_MEMBUF_T */
+#ifndef __cplusplus
+#  if __GNUC__
+#    define inline __inline__
+#  elif defined(_MSC_VER)
+#    define inline __inline
+#  else
+#    define inline
+#  endif
+#endif 
+
+static inline void membuf_clear(membuf_t* buf)
+{
+    buf->clear(buf->data);
+}
+
+static inline void* membuf_resize(membuf_t* buf, void* ptr, int size, int align)
+{
+    return buf->resize(buf->data, ptr, size, align);
+}
+
+static inline void membuf_collect(membuf_t* buf, void* ptr)
+{
+    buf->collect(buf->data, ptr);
+}
+
+static inline void* membuf_extract(membuf_t* buf, int size, int align)
+{
+    return buf->extract(buf->data, size, align);
+}
+
+/* END OF HAS_MEMBUF_T */
+#endif
 
 #ifndef __cplusplus
 # if __STDC_VERSION__ == 201112L
@@ -112,19 +139,13 @@ TABLE_API void table_init(table_t* table, membuf_t* membuffer);
 TABLE_API void table_free(table_t* table);
 
 TABLE_API bool table_has(const table_t* table, table_key_t key);
-TABLE_API bool table_try_get(const table_t* table,
-			     table_key_t    key,
-			     table_value_t* value);
-TABLE_API table_value_t table_get(const table_t* table,
-				  table_key_t    key,
-				  table_value_t  defvalue);
+TABLE_API bool table_try_get(const table_t* table, table_key_t key, table_value_t* value);
+TABLE_API table_value_t table_get(const table_t* table, table_key_t key, table_value_t defvalue);
 TABLE_API bool table_set(table_t* table, table_key_t key, table_value_t value);
 TABLE_API bool table_remove(table_t* table, table_key_t key);
 
 #if 0 || TABLE_EXTENSIONS
-TABLE_API table_key_t table_get_key(const table_t* table,
-				    table_value_t  value,
-				    table_key_t    defkey);
+TABLE_API table_key_t table_get_key(const table_t* table, table_value_t value, table_key_t defkey);
 TABLE_API bool table_has_value(const table_t* table, table_value_t value);
 TABLE_API bool table_remove_value(table_t* table, table_value_t value);
 #endif
@@ -166,7 +187,7 @@ void table_init(table_t* table, membuf_t* membuffer)
     int i;
     for (i = 0; i < TABLE_HASHS; i++)
     {
-	table->hashs[i] = -1;
+		table->hashs[i] = -1;
     }
 }
 
@@ -185,7 +206,7 @@ void table_free(table_t* table)
     int i;
     for (i = 0; i < TABLE_HASHS; i++)
     {
-	table->hashs[i] = -1;
+		table->hashs[i] = -1;
     }
 }
 
@@ -199,13 +220,13 @@ static table__findres_t table__find(const table_t* table, table_key_t key)
 
     while (res.curr > -1)
     {
-	if (TABLE_KEY_EQUAL(key, table->keys[res.curr]))
-	{
-	    break;
-	}
+		if (TABLE_KEY_EQUAL(key, table->keys[res.curr]))
+		{
+			break;
+		}
 
-	res.prev = res.curr;
-	res.curr = table->nexts[res.curr];
+		res.prev = res.curr;
+		res.curr = table->nexts[res.curr];
     }
 
     return res;
@@ -223,12 +244,12 @@ bool table_try_get(const table_t* table, table_key_t key, table_value_t* value)
 
     if (fs.curr > -1)
     {
-	*value = table->values[fs.curr];
-	return true;
+		*value = table->values[fs.curr];
+		return true;
     }
     else
     {
-	return false;
+		return false;
     }
 }
 
@@ -238,30 +259,25 @@ table_value_t table_get(const table_t* table, table_key_t key, table_value_t def
 
     if (fs.curr > -1)
     {
-	return table->values[fs.curr];
+		return table->values[fs.curr];
     }
     else
     {
-	return def;
+		return def;
     }
 }
 
-static bool table__resize(table_t* table,
-			  void** dst, int new_size,
-			  void* old_data, int old_size)
+static bool table__resize(table_t* table, void** dst, int new_size, void* old_data, int old_size)
 {
-    void* new_data = membuf_extract(table->membuffer, new_size, 4);
+    void* new_data = membuf_resize(table->membuffer, old_data, new_size, 4);
     if (new_data)
     {
-	memcpy(new_data, old_data, old_size);
-
-	membuf_collect(table->membuffer, old_data);
-	*dst = new_data;
-	return true;
+		*dst = new_data;
+		return true;
     }
     else
     {
-	return false;
+		return false;
     }
 }
 
@@ -271,84 +287,87 @@ bool table_set(table_t* table, table_key_t key, table_value_t value)
 
     if (fs.curr > -1)
     {
-	table->values[fs.curr] = value;
-	return true;
+		table->values[fs.curr] = value;
+		return true;
     }
     else
     {
-	/* find a hole in the containers */
-	if (table->hashs[fs.hash] > -1)
-	{
-	    int i;
-	    for (i = table->count - 2; i > -1; i--)
-	    {
-		if (table->nexts[i] < -1)
+		/* find a hole in the containers */
+		if (table->hashs[fs.hash] > -1)
 		{
-		    fs.curr = i;
-		    goto __table_set_values;
+			int i;
+			for (i = table->count - 2; i > -1; i--)
+			{
+				if (table->nexts[i] < -1)
+				{
+					fs.curr = i;
+					goto __table_set_values;
+				}
+			}
 		}
-	    }
-	}
 
-	/* append the value to the last position */
-	fs.curr = table->count++;
-	if (table->count <= table->capacity)
-	{
-	    goto __table_set_values;
-	}
+		/* append the value to the last position */
+		fs.curr = table->count++;
+		if (table->count <= table->capacity)
+		{
+			goto __table_set_values;
+		}
 
-	/* Resize the container to fit */
-	const int old_cap = table->capacity;
+		/* Resize the container to fit */
+		const int old_cap = table->capacity;
 
-	if (table->capacity <= 0) table->capacity  = TABLE_CAPACITY;
-	else                      table->capacity *= 2;
-	const int new_cap = table->capacity;
+		if (table->capacity <= 0) table->capacity  = TABLE_CAPACITY;
+		else                      table->capacity *= 2;
+		const int new_cap = table->capacity;
 
-	bool status;
-	/* resize table->nexts */
-	status = table__resize(table,
-			       (void**)&table->nexts,
-			       new_cap * sizeof(int),
-			       table->nexts, old_cap * sizeof(int));
-	if (!status)
-	{
-	    return false;
-	}
+		bool status;
+		/* resize table->nexts */
+		status = table__resize(
+			table, 
+			(void**)&table->nexts,
+			new_cap * sizeof(int),
+			table->nexts, old_cap * sizeof(int));
+		if (!status)
+		{
+	    	return false;
+		}
 
-	/* resize table->keys */
-	status = table__resize(table,
-			       (void**)&table->keys,
-			       new_cap * sizeof(table_key_t),
-			       table->keys, old_cap * sizeof(table_key_t));
-	if (!status)
-	{
-	    return false;
-	}
+		/* resize table->keys */
+		status = table__resize(
+			table,
+			(void**)&table->keys,
+			new_cap * sizeof(table_key_t),
+			table->keys, old_cap * sizeof(table_key_t));
+		if (!status)
+		{
+			return false;
+		}
 
-	/* resize table->values */
-	status = table__resize(table,
-			       (void**)&table->values,
-			       new_cap * sizeof(table_value_t),
-			       table->values, old_cap * sizeof(table_value_t));
-	if (!status)
-	{
-	    return false;
-	}
+		/* resize table->values */
+		status = table__resize(
+			table,
+			(void**)&table->values,
+			new_cap * sizeof(table_value_t),
+			table->values, old_cap * sizeof(table_value_t));
+		if (!status)
+		{
+			return false;
+		}
 	
     __table_set_values:
-	if (fs.prev > -1)
-	{
-	    table->nexts[fs.prev] = fs.curr;
-	}
-	else
-	{
-	    table->hashs[fs.hash] = fs.curr;
-	}
+		if (fs.prev > -1)
+		{
+			table->nexts[fs.prev] = fs.curr;
+		}
+		else
+		{
+			table->hashs[fs.hash] = fs.curr;
+		}
 
-	table->nexts[fs.curr]  = -1;
-	table->keys[fs.curr]   = key;
-	table->values[fs.curr] = value;
-	return true;
+		table->nexts[fs.curr]  = -1;
+		table->keys[fs.curr]   = key;
+		table->values[fs.curr] = value;
+		return true;
     }
 }
 
@@ -357,19 +376,19 @@ bool table_remove(table_t* table, table_key_t key)
     table__findres_t fs = table__find(table, key);
     if (fs.curr > -1)
     {
-	if (fs.prev > -1)
-	{
-	    table->nexts[fs.prev] = -1;
-	}
-	else
-	{
-	    table->hashs[fs.hash] = -1;
-	}
-	return true;
+		if (fs.prev > -1)
+		{
+			table->nexts[fs.prev] = -1;
+		}
+		else
+		{
+			table->hashs[fs.hash] = -1;
+		}
+		return true;
     }
     else
     {
-	return false;
+		return false;
     }
 }
 #endif
