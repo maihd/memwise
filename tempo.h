@@ -5,15 +5,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(_MSC_VER)
+#include <malloc.h>
+#undef  alloca
+#define alloca _alloca
+#else
+#include <alloca.h>
+#endif
+
 #define __MCONCAT(x, y) x ## y
 #define _MCONCAT(x, y) __MCONCAT(x, y)
 #define _MGENSYM(x)    _MCONCAT(x, __LINE__)
-
-#if defined(__cplusplus)
-#define _MPTR_ASSIGN(a, b) ((a) = (decltype(a))(b))
-#else
-#define _MPTR_ASSIGN(a, b) ((a) = (b))
-#endif
 
 #define MEMWISE_ERROR_INDEX  0
 #define MEMWISE_ERROR_EMPTY  1
@@ -42,117 +44,128 @@
 /**************************
  * Temporary array
  **************************/
-#define memwise__tempo_t(type_t, c) \
-    int    count;		    \
-    type_t elements[c]	    
+#define memwise__tempo_t(type_t)    \
+    int     count;		            \
+    int     capacity;               \
+    type_t* elements	    
 
-#define memwise__tempo_init(t)      \
-    do { (t).count = 0; } while (0)
-
-#define memwise__tempo_capacity(t)			\
-    (sizeof((t).elements) / sizeof((t).elements[0]))
-
-#define memwise__tempo_set(t, i, e)					\
-    do {								\
-	if (i <= (t).count) {						\
-	    (t).count = i + 1;						\
-	    MEMWISE_ASSERT((t).count <= memwise__tempo_capacity(t),	\
-			   "tempo_set", MEMWISE_ERROR_MEMORY);		\
-	}								\
-	(t).elements[i] = e;						\
+#define memwise__tempo_init(t, c)                                                   \
+    do {                                                                            \
+        (t).count    = 0;                                                           \
+        (t).capacity = c;                                                           \
+        *((void**)&(t).elements) = alloca(c * sizeof((t).elements[0]));             \
     } while (0)
 
-#define memwise__tempo_get(t, i)					\
-    (MEMWISE_ASSERT(i > -1 && i < (t).count,				\
-		    "tempo_get",					\
-		    MEMWISE_ERROR_INDEX),				\
+#define memwise__tempo_set(t, i, e, res)				\
+    do {                                                \
+        if (i < 0) break;                               \
+        if (i >= (t).count) {						    \
+            if (i + 1 <= (t).capacity) {                \
+                (t).count = i + 1;						\
+            } else {                                    \
+                res = 0;                                \
+                break;                                  \
+            }                                           \
+        }                                               \
+        (t).elements[i] = e;                            \
+        res = 1;                                        \
+    } while (0)
+
+#define memwise__tempo_get(t, i)              \
+    (MEMWISE_ASSERT(i > -1 && i < (t).count,  \
+		    "tempo_get",                      \
+		    MEMWISE_ERROR_INDEX),             \
      (t).elements[i])
 
-#define memwise__tempo_ref(t, i)					\
-    (MEMWISE_ASSERT(i > -1 && i < memwise__tempo_capacity(t),		\
-		    "tempo_ref",					\
-		    MEMWISE_ERROR_INDEX),				\
+#define memwise__tempo_ref(t, i)                               \
+    (MEMWISE_ASSERT(i > -1 && i < capacity(t).capacity,        \
+		    "tempo_ref",                                       \
+		    MEMWISE_ERROR_INDEX),                              \
      (t).elements + i)
 
-#define memwise__tempo_pop(t)						\
-    (MEMWISE_ASSERT((t).count > 0,					\
-		    "tempo_pop",					\
-		    MEMWISE_ERROR_EMPTY),				\
+#define memwise__tempo_pop(t)                \
+    (MEMWISE_ASSERT((t).count > 0,           \
+		    "tempo_pop",                     \
+		    MEMWISE_ERROR_EMPTY),            \
      (t).elements[--(t).count])
 
-#define memwise__tempo_push(t, e)					\
-    do {								\
-	int _i_ = (t).count;						\
-	tempo_set(t, _i_, e);						\
+#define memwise__tempo_push(t, e)       \
+    do {                                \
+	    int _i_ = (t).count;            \
+	    tempo_set(t, _i_, e);           \
     } while (0)
 
-#define memwise__tempo_find(t, e, i)			\
+#define memwise__tempo_find(t, e, i)                 \
     memwise__tempo_find_cmp(t, e, i, MEMWISE_DEFCMP)
 
-#define memwise__tempo_find_cmp(t, e, i, cmp)		\
-    do {						\
-	int _j_; int _m_ = (t).count;			\
-	for (_j_ = 0; _j_ < _m_; _j_++)	{		\
-	    if (cmp(e, (t).elements[_j_])) {		\
-	        (i) = _j_; break;			\
-	    }						\
-	}						\
+#define memwise__tempo_find_cmp(t, e, i, cmp)     \
+    do {                                          \
+        int _j_; int _m_ = (t).count;             \
+        for (_j_ = 0; _j_ < _m_; _j_++)	{         \
+            if (cmp(e, (t).elements[_j_])) {      \
+                (i) = _j_; break;                 \
+            }                                     \
+        }                                         \
     } while (0)
 
-#define memwise__tempo_rfind(t, e, i)			\
+#define memwise__tempo_rfind(t, e, i)                 \
     memwise__tempo_rfind_cmp(t, e, i, MEMWISE_DEFCMP)
 
-#define memwise__tempo_rfind_cmp(t, e, i, cmp)		\
-    do {						\
-	int _j_; int _m_ = (t).count;			\
-	for (_j_ = _m_ - 1; _j_ > 0; _j_--)	{	\
-	    if (cmp(e, (t).elements[_j_])) {		\
-	        (i) = _j_; break;			\
-	    }						\
-	}						\
+#define memwise__tempo_rfind_cmp(t, e, i, cmp)      \
+    do {                                            \
+        int _j_; int _m_ = (t).count;               \
+        for (_j_ = _m_ - 1; _j_ > 0; _j_--)	{       \
+            if (cmp(e, (t).elements[_j_])) {        \
+                (i) = _j_; break;                   \
+            }                                       \
+        }                                           \
     } while (0)
 
-#define memwise__tempo_erase(t, i)					\
-    do {								\
-	MEMWISE_ASSERT(!(i < 0 || i >= (t).count),			\
-		       "tempo_erase", MEMWISE_ERROR_INDEX);		\
-	int _i_; int _n_ = (t).count;					\
-	for (_i_ = i; _i_ < _n_; _i_++) {				\
-	    (t).elements[_i_] = (t).elements[_i_ + 1];			\
-	}								\
+#define memwise__tempo_erase(t, i)                      \
+    do {                                                \
+        MEMWISE_ASSERT(!(i < 0 || i >= (t).count),      \
+                "tempo_erase", MEMWISE_ERROR_INDEX);    \
+        int _i_; int _n_ = (t).count;                   \
+        for (_i_ = i; _i_ < _n_; _i_++) {               \
+            (t).elements[_i_] = (t).elements[_i_ + 1];  \
+        }                                               \
     } while (0)
 
-#define memwise__tempo_remove(t, e)			\
-    memwise__tempo_remove_cmp(t, e, MEMWISE_DEFCMP)
+#define memwise__tempo_remove(t, e, res)	            \
+    memwise__tempo_remove_cmp(t, e, res, MEMWISE_DEFCMP)
 
-#define memwise__tempo_remove_cmp(t, e, cmp)		\
-    do {						\
-	int _k_;					\
-	memwise__tempo_find_cmp(t, e, _k_, cmp);	\
-	memwise__tempo_erase(t, _k_);			\
-    } while (0)
-
-
-#define memwise__tempo_insert(t, i, e)					\
-    do {								\
-        MEMWISE_ASSERT((t).count < memwise__tempo_capacity(t),		\
-		       "tempo_insert", MEMWISE_ERROR_MEMORY);		\
-	int _i_; int _n_ = (t).count++, _e_ = i;			\
-	for (_i_ = _n_; _i_ < _e_; _i_--)				\
-	    (t).elements[_i_] = (t).elements[_i_ - 1];			\
-	(t).elements[_e_] = e;						\
+#define memwise__tempo_remove_cmp(t, e, res, cmp)   \
+    do {						                    \
+        int _k_;					                \
+        memwise__tempo_find_cmp(t, e, _k_, cmp);	\
+        memwise__tempo_erase(t, _k_);			    \
+        res = _k_ > -1;                             \
     } while (0)
 
 
-#define memwise__tempo__foreach(t, type_t, v, i, n, elm)		\
-    type_t v; type_t* elm = (t).elements;				\
-    int i = 0; int n = (t).count;					\
-    for (v = elm[i]; i < n; v = elm[++i]) 
+#define memwise__tempo_insert(t, i, e, res)                        \
+    do {                                                           \
+        if ((t).count < (t).capacity) {                            \
+            res = 0;                                               \
+            break;                                                 \
+        }                                                          \
+        int _i_; int _n_ = (t).count++, _e_ = i;                   \
+        for (_i_ = _n_; _i_ < _e_; _i_--)                          \
+            (t).elements[_i_] = (t).elements[_i_ - 1];             \
+        (t).elements[_e_] = e;                                     \
+        res = 1;                                                   \
+    } while (0)
 
-#define tempo_foreach(t, type_t, v)				\
-    memwise__tempo__foreach(t, type_t, v,			\
-			    _MGENSYM(_i_),			\
-			    _MGENSYM(_n_),			\
+
+#define memwise__tempo__foreach(t, type_t, v, i, n, elm)   \
+    type_t v; type_t* elm = (t).elements;                  \
+    int i = 0; int n = (t).count;                          \
+    for (v = elm[i]; i < n; v = elm[++i])
+
+#define tempo_foreach(t, type_t, v)                 \
+    memwise__tempo__foreach(t, type_t, v,           \
+			    _MGENSYM(_i_),                      \
+			    _MGENSYM(_n_),                      \
 			    _MGENSYM(_a_))
 
 
@@ -171,7 +184,7 @@
 
 #define tempo_capacity(t) memwise__tempo_capacity(t)
 
-#define tempo_set(t, i, e) memwise__tempo_set(t, i, e)
+#define tempo_set(t, i, e, res) memwise__tempo_set(t, i, e, res)
 
 #define tempo_get(t, i) memwise__tempo_get(t, i)
 
@@ -187,27 +200,30 @@
 
 #define tempo_erase(t, i) memwise__tempo_erase(t, i) 
 
-#define tempo_remove(t, e) memwise__tempo_remove(t, e)
+#define tempo_remove(t, e, res) memwise__tempo_remove(t, e, res)
 
-#define tempo_remove_cmp(t, e, cmp) memwise__tempo_remove_cmd(t, e, cmp)
+#define tempo_remove_cmp(t, e, res, cmp) memwise__tempo_remove_cmd(t, e, res, cmp)
 
-#define tempo_insert(t, i, e) memwise__tempo_insert(t, i, e)
+#define tempo_insert(t, i, e, res) memwise__tempo_insert(t, i, e)
 
 #else
 
 /**
  * Temporary array
  */
-template <typename type_t, int capacity>
-struct tempo_t
+template <typename type_t>
+union tempo_t
 {
 public: /* @region: Fields */
-    memwise__tempo_t(type_t, capacity);
+    struct
+    {
+        memwise__tempo_t(type_t);
+    };
 
 public: /* @region: Constructors */
-    inline tempo_t(void)
+    inline tempo_t(int capacity)
     {
-        memwise__tempo_init(*this);
+        memwise__tempo_init(*this, capacity);
     }
 
 public: /* @region: Operators */
@@ -234,75 +250,81 @@ public: /* @region: Operators */
 
 namespace tempo
 {
-    template <typename type_t, int capacity>
-    void set(tempo_t<type_t, capacity>& tempo, int index, const type_t& value)
+    template <typename type_t>
+    inline bool set(tempo_t<type_t>& tempo, int index, const type_t& value)
     {
-        memwise__tempo_set(tempo, index, value);
+        bool res;
+        memwise__tempo_set(tempo, index, value, res);
+        return res;
     }
 
-    template <typename type_t, int capacity>
-    inline const type_t& get(const tempo_t<type_t, capacity>& tempo, int index)
+    template <typename type_t>
+    inline const type_t& get(const tempo_t<type_t>& tempo, int index)
     {
         return memwise__tempo_get(tempo, index);
     }
 
-    template <typename type_t, int capacity>
-    inline type_t* ref(tempo_t<type_t, capacity>& tempo, int index)
+    template <typename type_t>
+    inline type_t* ref(tempo_t<type_t>& tempo, int index)
     {
         return memwise__tempo_ref(tempo, index);
     }
 
-    template <typename type_t, int capacity>
-    inline const type_t* ref(const tempo_t<type_t, capacity>& tempo, int index)
+    template <typename type_t>
+    inline const type_t* ref(const tempo_t<type_t>& tempo, int index)
     {
         return memwise__tempo_ref(tempo, index);
     }
 
-    template <typename type_t, int capacity>
-    inline const type_t& pop(tempo_t<type_t, capacity>& tempo)
+    template <typename type_t>
+    inline const type_t& pop(tempo_t<type_t>& tempo)
     {
         return memwise__tempo_pop(tempo);
     }
 
-    template <typename type_t, int capacity>
-    inline void push(tempo_t<type_t, capacity>& tempo, const type_t& value)
+    template <typename type_t>
+    inline bool push(tempo_t<type_t>& tempo, const type_t& value)
     {
-        tempo_set(tempo, value);
+        return set(tempo, tempo.count, value);
     }
 
-    template <typename type_t, int capacity>
-    int find(const tempo_t<type_t, capacity>& tempo, const type_t& value)
+    template <typename type_t>
+    int find(const tempo_t<type_t>& tempo, const type_t& value)
     {
         int res;
         memwise__tempo_find(tempo, value, res);
         return res;
     }
 
-    template <typename type_t, int capacity>
-    int rfind(const tempo_t<type_t, capacity>& tempo, const type_t& value)
+    template <typename type_t>
+    int rfind(const tempo_t<type_t>& tempo, const type_t& value)
     {
         int res;
         memwise__tempo_rfind(tempo, value, res);
         return res;
     }
 
-    template <typename type_t, int capacity>
-    void erase(tempo_t<type_t, capacity>& tempo, int index)
+    template <typename type_t>
+    inline void erase(tempo_t<type_t>& tempo, int index)
     {
         memwise__tempo_erase(tempo, index);
     }
 
-    template <typename type_t, int capacity>
-    void remove(tempo_t<type_t, capacity>& tempo, const type_t& value)
+    template <typename type_t>
+    inline bool remove(tempo_t<type_t>& tempo, const type_t& value)
     {
-        memwise__tempo_remove(tempo, value);
+        bool res;
+        memwise__tempo_remove(tempo, value, res);
+        return res;
     }
 
 
-    template <typename type_t, int capacity>
-    void insert(tempo_t<type_t, capacity>& tempo, int index, const type_t& value)
+    template <typename type_t>
+    inline bool insert(tempo_t<type_t>& tempo, int index, const type_t& value)
     {
-        memwise__tempo_insert(tempo, index, value);
+        bool res;
+        memwise__tempo_insert(tempo, index, value, res);
+        return res;
     }
 }
 #endif /* MEMWISE_C_VERSIONS */
