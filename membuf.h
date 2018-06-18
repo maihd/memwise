@@ -128,11 +128,11 @@ membuf_t* membuf_new_linear(int size)
     membuf_t* res = NULL;
     if (mem)
     {
-	return membuf_linear(mem, real_size);
+	    return membuf_linear(mem, real_size);
     }
     else
     {
-	return NULL;
+	    return NULL;
     }
 }
 
@@ -142,11 +142,11 @@ membuf_t* membuf_new_stack(int size)
     void*     mem = malloc(real_size);
     if (mem)
     {
-	return membuf_stack(mem, real_size);
+	    return membuf_stack(mem, real_size);
     }
     else
     {
-	return NULL;
+	    return NULL;
     }
 }
 
@@ -156,11 +156,11 @@ membuf_t* membuf_new_destack(int size)
     void*     mem = malloc(real_size);
     if (mem)
     {
-	return membuf_destack(mem, real_size);
+	    return membuf_destack(mem, real_size);
     }
     else
     {
-	return NULL;
+	    return NULL;
     }
 }
 
@@ -171,11 +171,11 @@ membuf_t* membuf_new_pool(int count, int block)
     void*     mem = malloc(real_size);
     if (mem)
     {
-	return membuf_pool(mem, real_size, block);
+	    return membuf_pool(mem, real_size, block);
     }
     else
     {
-	return NULL;
+	    return NULL;
     }
 }
 
@@ -196,41 +196,43 @@ static void* membuf_heap_extract(void* data, int size, int align);
 static void* membuf_heap_resize(void* data, void* ptr, int size, int align)
 {
     (void)data;
-    (void)align;
+
+    assert(align > 1 && align <= 256);
+    assert((align & (align - 1)) == 0);
 
     if (ptr)
     {
-	int misalign = *((unsigned char*)ptr - 1);
-	void* res = realloc((char*)ptr - misalign, size + align);
-	if (res)
-	{
-	    misalign = (int)((intptr_t)res & align);
-	    
-	    res = (char*)res + misalign;
-	    *((unsigned char*)res - 1) = misalign;
-	}
-	return res;
+        int misalign = *((unsigned char*)ptr - 1);
+        void* res = realloc((char*)ptr - misalign, size + align);
+        if (res)
+        {
+            misalign = align - (int)((intptr_t)res & align);
+            
+            res = (char*)res + misalign;
+            *((unsigned char*)res - 1) = misalign;
+        }
+        return res;
     }
     else
     {
-	return membuf_heap_extract(NULL, size, align);
+	    return membuf_heap_extract(NULL, size, align);
     }
 }
 
 static void* membuf_heap_extract(void* data, int size, int align)
 {
     (void)data;
-    (void)align;
 
     assert(align > 1 && align <= 256);
+    assert((align & (align - 1)) == 0);
     
     void* res = malloc(size + align);
     if (res)
     {
-	int misalign = (int)((intptr_t)res & align);
+	    int misalign = align - (int)((intptr_t)res & align);
 	
-	res = (char*)res + misalign;
-	*((unsigned char*)res - 1) = misalign;
+	    res = (char*)res + misalign;
+	    *((unsigned char*)res - 1) = misalign;
     }
     return res;
 }
@@ -241,8 +243,8 @@ static void  membuf_heap_collect(void* data, void* pointer)
 
     if (pointer)
     {
-	int misalign = *((unsigned char*)pointer - 1);
-	free((char*)pointer - misalign);
+	    int misalign = *((unsigned char*)pointer - 1);
+	    free((char*)pointer - misalign);
     }
 }
 
@@ -273,17 +275,17 @@ static void* membuf_linear_resize(void* userdata, void* ptr, int size, int align
     intptr_t address = (intptr_t)ptr - (intptr_t)userdata;
     if (address > 0 && address + size <= buf->tail)
     {
-	buf->tail = buf->tail > address + size ? buf->tail : address + size;
-	return ptr;
+	    buf->tail = buf->tail > address + size ? buf->tail : address + size;
+	    return ptr;
     }
     else
     {
-	void* res = membuf_linear_extract(userdata, size, align);
-	if (ptr && res)
-	{
-	    memcpy(res, ptr, size);
-	}
-	return res;
+	    void* res = membuf_linear_extract(userdata, size, align);
+	    if (ptr && res)
+	    {
+	        memcpy(res, ptr, size);
+	    }
+	    return res;
     }
 }
 
@@ -293,13 +295,13 @@ static void* membuf_linear_extract(void* userdata, int size, int align)
 
     if (buf->tail + size <= buf->size)
     {
-	char* mem = (char*)userdata + sizeof(linearbuf_t) + buf->tail;
-	buf->tail += size;
-	return mem;
+	    char* mem = (char*)userdata + sizeof(linearbuf_t) + buf->tail;
+	    buf->tail += size;
+	    return mem;
     }
     else
     {
-	return NULL;
+	    return NULL;
     }
 }
 
@@ -309,7 +311,7 @@ static void  membuf_linear_collect(void* userdata, void* ptr)
     intptr_t address = (intptr_t)ptr - (intptr_t)userdata;
     if (address > 0 && address < buf->tail)
     {
-	buf->tail = 0;
+	    buf->tail = 0;
     }
 }
 
@@ -317,22 +319,22 @@ membuf_t* membuf_linear(void* data, int size)
 {
     if (size <= sizeof(membuf_t) + sizeof(linearbuf_t))
     {
-	return NULL;
+	    return NULL;
     }
     else
     {
-	membuf_t* buf = (membuf_t*)data;
-	buf->data     = (void*)((char*)data + sizeof(membuf_t));
-	buf->clear    = membuf_linear_clear;
-	buf->resize   = membuf_linear_resize;
-	buf->extract  = membuf_linear_extract;
-	buf->collect  = membuf_linear_collect;
+        membuf_t* buf = (membuf_t*)data;
+        buf->data     = (void*)((char*)data + sizeof(membuf_t));
+        buf->clear    = membuf_linear_clear;
+        buf->resize   = membuf_linear_resize;
+        buf->extract  = membuf_linear_extract;
+        buf->collect  = membuf_linear_collect;
 
-	linearbuf_t* ldata = (linearbuf_t*)buf->data;
-	ldata->tail = 0;
-	ldata->size = size - sizeof(membuf_t) - sizeof(linearbuf_t);
-	
-	return buf;
+        linearbuf_t* ldata = (linearbuf_t*)buf->data;
+        ldata->tail = 0;
+        ldata->size = size - sizeof(membuf_t) - sizeof(linearbuf_t);
+        
+        return buf;
     }
 }
 
@@ -350,13 +352,13 @@ static void* membuf_stack_resize(void* userdata, void* ptr, int size, int align)
     intptr_t address = (intptr_t)ptr - (intptr_t)userdata;
     if (buf->tail > -1 && address == buf->tail + sizeof(int))
     {
-	int* next = (int*)((char*)ptr - sizeof(int));
-	*next = size;
-	return ptr;
+        int* next = (int*)((char*)ptr - sizeof(int));
+        *next = size;
+        return ptr;
     }
     else
     {
-	return membuf_stack_extract(userdata, size, align);
+	    return membuf_stack_extract(userdata, size, align);
     }
 }
 
@@ -366,35 +368,35 @@ static void* membuf_stack_extract(void* userdata, int size, int align)
 
     if (buf->tail < 0)
     {
-	if (buf->size >= size)
-	{
-	    buf->tail = 0;
-	    int* next = (int*)((char*)userdata + sizeof(stackbuf_t));
-	    void* mem = (char*)next + sizeof(int);
-	    *next = size;
-	    return mem;
-	}
-	else
-	{
-	    return NULL;
-	}
+        if (buf->size >= size)
+        {
+            buf->tail = 0;
+            int* next = (int*)((char*)userdata + sizeof(stackbuf_t));
+            void* mem = (char*)next + sizeof(int);
+            *next = size;
+            return mem;
+        }
+        else
+        {
+            return NULL;
+        }
     }
     else
     {
-	int* next = (int*)((char*)userdata + sizeof(stackbuf_t) + buf->tail);
+        int* next = (int*)((char*)userdata + sizeof(stackbuf_t) + buf->tail);
 
-	if (buf->tail + (*next) + size <= buf->size)
-	{
-	    buf->tail += *next;
-	    next = (int*)((char*)next + (*next));
-	    void* mem = (char*)next + sizeof(int);
-	    *next = size;
-	    return mem;
-	}
-	else
-	{
-	    return NULL;
-	}
+        if (buf->tail + (*next) + size <= buf->size)
+        {
+            buf->tail += *next;
+            next = (int*)((char*)next + (*next));
+            void* mem = (char*)next + sizeof(int);
+            *next = size;
+            return mem;
+        }
+        else
+        {
+            return NULL;
+        }
     }
 }
 
@@ -404,15 +406,15 @@ static void  membuf_stack_collect(void* userdata, void* ptr)
     intptr_t address = (intptr_t)ptr - (intptr_t)userdata;
     if (buf->tail > -1 && address == buf->tail + sizeof(int))
     {
-	if (buf->tail > 0)
-	{
-	    int size = *(int*)((char*)ptr - sizeof(int));
-	    buf->tail -= size;
-	}
-	else
-	{
-	    buf->tail = -1;
-	}
+        if (buf->tail > 0)
+        {
+            int size = *(int*)((char*)ptr - sizeof(int));
+            buf->tail -= size;
+        }
+        else
+        {
+            buf->tail = -1;
+        }
     }
 }
 
@@ -420,22 +422,22 @@ membuf_t* membuf_stack(void* data, int size)
 {
     if (size <= sizeof(membuf_t) + sizeof(stackbuf_t))
     {
-	return NULL;
+	    return NULL;
     }
     else
     {
-	membuf_t* buf = (membuf_t*)data;
-	buf->data     = (void*)((char*)data + sizeof(membuf_t));
-	buf->clear    = membuf_stack_clear;
-	buf->resize   = membuf_stack_resize;
-	buf->extract  = membuf_stack_extract;
-	buf->collect  = membuf_stack_collect;
+        membuf_t* buf = (membuf_t*)data;
+        buf->data     = (void*)((char*)data + sizeof(membuf_t));
+        buf->clear    = membuf_stack_clear;
+        buf->resize   = membuf_stack_resize;
+        buf->extract  = membuf_stack_extract;
+        buf->collect  = membuf_stack_collect;
 
-	stackbuf_t* sdata = (stackbuf_t*)buf->data;
-	sdata->tail = -1;
-	sdata->size = size - sizeof(membuf_t) - sizeof(stackbuf_t);
-	
-	return buf;
+        stackbuf_t* sdata = (stackbuf_t*)buf->data;
+        sdata->tail = -1;
+        sdata->size = size - sizeof(membuf_t) - sizeof(stackbuf_t);
+        
+        return buf;
     }
 }
 
@@ -484,23 +486,23 @@ membuf_t* membuf_destack(void* data, int size)
 {
     if (size <= sizeof(membuf_t) + sizeof(destackbuf_t))
     {
-	return NULL;
+	    return NULL;
     }
     else
     {
-	membuf_t* buf = (membuf_t*)data;
-	buf->data     = (void*)((char*)data + sizeof(membuf_t));
-	buf->clear    = membuf_destack_clear;
-	buf->resize   = membuf_destack_resize;
-	buf->extract  = membuf_destack_extract;
-	buf->collect  = membuf_destack_collect;
+        membuf_t* buf = (membuf_t*)data;
+        buf->data     = (void*)((char*)data + sizeof(membuf_t));
+        buf->clear    = membuf_destack_clear;
+        buf->resize   = membuf_destack_resize;
+        buf->extract  = membuf_destack_extract;
+        buf->collect  = membuf_destack_collect;
 
-	destackbuf_t* userdata = (destackbuf_t*)buf->data;
-	userdata->tail = 0;
-	userdata->head = 0;
-	userdata->size = size - sizeof(membuf_t) - sizeof(destackbuf_t);
-	
-	return buf;
+        destackbuf_t* userdata = (destackbuf_t*)buf->data;
+        userdata->tail = 0;
+        userdata->head = 0;
+        userdata->size = size - sizeof(membuf_t) - sizeof(destackbuf_t);
+        
+        return buf;
     }
 }
 
@@ -525,14 +527,14 @@ static void* membuf_pool_extract(void* userdata, int size, int align)
 
     if (buf->block == size && buf->first)
     {
-	void* mem  = (char*)buf->first + sizeof(void*);
-	buf->first = *((void**)buf->first);
-	buf->count = buf->count - 1;
-	return mem;
+        void* mem  = (char*)buf->first + sizeof(void*);
+        buf->first = *((void**)buf->first);
+        buf->count = buf->count - 1;
+        return mem;
     }
     else
     {
-	return NULL;
+	    return NULL;
     }
 }
 
@@ -543,10 +545,10 @@ static void  membuf_pool_collect(void* userdata, void* ptr)
     intptr_t address = (intptr_t)ptr - (intptr_t)userdata;
     if (address > 0 && address < buf->size)
     {
-	void** block = (void**)((char*)ptr - sizeof(void*));
-	*block = buf->first;
-	buf->first = block;
-	buf->count = buf->count + 1;
+        void** block = (void**)((char*)ptr - sizeof(void*));
+        *block = buf->first;
+        buf->first = block;
+        buf->count = buf->count + 1;
     }
 }
 
@@ -554,32 +556,32 @@ membuf_t* membuf_pool(void* data, int size, int block)
 {
     if (size <= sizeof(membuf_t) + sizeof(poolbuf_t))
     {
-	return NULL;
+	    return NULL;
     }
     else
     {
-	membuf_t* buf = (membuf_t*)data;
-	buf->data     = (void*)((char*)data + sizeof(membuf_t));
-	buf->clear    = membuf_pool_clear;
-	buf->resize   = membuf_pool_resize;
-	buf->extract  = membuf_pool_extract;
-	buf->collect  = membuf_pool_collect;
+        membuf_t* buf = (membuf_t*)data;
+        buf->data     = (void*)((char*)data + sizeof(membuf_t));
+        buf->clear    = membuf_pool_clear;
+        buf->resize   = membuf_pool_resize;
+        buf->extract  = membuf_pool_extract;
+        buf->collect  = membuf_pool_collect;
 
-	poolbuf_t* userdata = (poolbuf_t*)buf->data;
-	userdata->size  = size - sizeof(membuf_t) - sizeof(poolbuf_t);
-	userdata->count = userdata->size / (sizeof(void*) + block);
-	userdata->block = block;
-	userdata->first = (char*)userdata + sizeof(poolbuf_t);
+        poolbuf_t* userdata = (poolbuf_t*)buf->data;
+        userdata->size  = size - sizeof(membuf_t) - sizeof(poolbuf_t);
+        userdata->count = userdata->size / (sizeof(void*) + block);
+        userdata->block = block;
+        userdata->first = (char*)userdata + sizeof(poolbuf_t);
 
-	int i;
+        int i;
         char** ptr = (char**)userdata->first;
-	for (i = 0; i < userdata->count - 1; i++)
-	{
-	    ptr = (char**)(*ptr = (char*)ptr + (sizeof(void*) + block));
-	}
-	*ptr = NULL;
-	
-	return buf;
+        for (i = 0; i < userdata->count - 1; i++)
+        {
+            ptr = (char**)(*ptr = (char*)ptr + (sizeof(void*) + block));
+        }
+        *ptr = NULL;
+        
+        return buf;
     }
 }
 #endif
