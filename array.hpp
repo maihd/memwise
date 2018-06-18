@@ -219,7 +219,7 @@ namespace array
     }
 
     template <typename type_t>
-    inline bool push(array_t<type_t>& array, type_t value)
+    inline bool push(array_t<type_t>& array, const type_t& value)
     {
 		return set(array, array.count, value);
     }

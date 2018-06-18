@@ -232,7 +232,7 @@ static void* membuf_heap_extract(void* data, int size, int align)
 	    int misalign = align - (int)((intptr_t)res & align);
 	
 	    res = (char*)res + misalign;
-	    *((unsigned char*)res - 1) = misalign;
+	    *((unsigned char*)res - 1) = (unsigned char)misalign;
     }
     return res;
 }
@@ -244,7 +244,8 @@ static void  membuf_heap_collect(void* data, void* pointer)
     if (pointer)
     {
 	    int misalign = *((unsigned char*)pointer - 1);
-	    free((char*)pointer - misalign);
+        void* target = (char*)pointer - misalign;
+	    free(target);
     }
 }
 
