@@ -242,6 +242,7 @@ namespace table
         {
             value_t* values = (value_t*)table.values;
             values[curr] = value;
+            return true;
         }
         else
         {
@@ -322,6 +323,8 @@ namespace table
             ((value_t*)table.values)[curr] = value;
             return true;
         }
+
+        return false;
     }
 
     template <typename key_t, typename value_t>
