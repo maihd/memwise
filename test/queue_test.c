@@ -3,11 +3,11 @@
 
 #define QUEUE_CONFIG
 #define QUEUE_PREFIX iqueue
-#include "queue.h"
+#include "../queue.h"
 
 #define QUEUE_IMPL
 #define queue_element_t int
-#include "queue.h"
+#include "../queue.h"
 
 void* membuf_default_extract(void* data, int size, int align)
 {

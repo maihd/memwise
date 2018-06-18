@@ -1,8 +1,8 @@
 #include <stdio.h>
-#include "array.hpp"
+#include "../array.hpp"
 
 #define MEMBUF_IMPL
-#include "membuf.h"
+#include "../membuf.h"
 
 int main(int argc, char* argv[])
 {
@@ -16,6 +16,11 @@ int main(int argc, char* argv[])
 
     printf("arr[%d] = %d\n", 1, arr[1]);
     printf("arr[%d] = %d\n", 1, array::get(arr, 1));
+
+    /* Add new slot */
+    printf("arr.count = %d\n", arr.count);
+    array::add(arr) = 10;
+    printf("arr.count = %d\n", arr.count);
 
     return 0;
 }

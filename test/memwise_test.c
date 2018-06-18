@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "memwise.h"
+#include "../memwise.h"
 
 typedef array_t(int) intarr_t;
 

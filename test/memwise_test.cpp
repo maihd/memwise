@@ -1,7 +1,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "memwise.h"
+#include "../memwise.h"
 
 void* membuf_default_extract(void* data, int size, int align)
 {

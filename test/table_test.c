@@ -3,14 +3,14 @@
 
 #define TABLE_CONFIG
 #define TABLE_PREFIX  itable
-#include "table.h"
+#include "../table.h"
 
 #define table_key_t   int
 #define table_value_t int
 #define TABLE_HASHFUNC(x) (x)
 #define TABLE_KEY_EQUAL(a, b) ((a) == (b))
 #define TABLE_IMPL
-#include "table.h"
+#include "../table.h"
 
 void* membuf_default_extract(void* data, int size, int align)
 {

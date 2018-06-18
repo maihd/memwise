@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #define MEMBUF_IMPL
-#include "membuf.h"
+#include "../membuf.h"
 
 int main(int argc, char* argv[])
 {

@@ -3,15 +3,15 @@
 #include <string.h>
 
 #define MEMBUF_IMPL
-#include "membuf.h"
+#include "../membuf.h"
 
 #define ARRAY_CONFIG
 #define ARRAY_PREFIX intarr
-#include "array.h"
+#include "../array.h"
 
 #define ARRAY_IMPL
 #define array_element_t int
-#include "array.h"
+#include "../array.h"
 
 int main(int argc, char* argv[])
 {

@@ -193,6 +193,24 @@ namespace array
 		}
     }
 
+	/**
+	 * Add new slot to array
+	 */
+	template <typename type_t>
+	inline type_t& add(array_t<type_t>& array)
+	{
+		if (ensure(array, array.count + 1))
+		{
+			*((int*)&array.count) = array.count + 1;
+			return array.elements[array.count - 1];
+		}
+		else
+		{
+			assert(0 && "array::add: Out of memory");
+			return *((type_t*)NULL); /* Will cause runtime error */ 
+		}
+	} 
+
     template <typename type_t>
     inline const type_t& get(const array_t<type_t>& array, int index)
     {
