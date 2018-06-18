@@ -269,8 +269,8 @@ namespace table
 
             /* Resize the container to fit */
             int new_cap;
-            if (table.capacity <= 0) new_cap  = 64;
-            else                     new_cap *= 2;
+            if (table.capacity <= 0) new_cap = 64;
+            else                     new_cap = table.capacity * 2;
             *((int*)&table.capacity) = new_cap;
 
             bool status;
