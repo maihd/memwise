@@ -150,9 +150,9 @@ namespace array
 				new_capacity *= 2;
 			}
 
-			*((int*)&array.capacity)     = new_capacity;
-			*((type_t**)&array.elements) =
-				(type_t*)membuf_resize(array.membuffer, array.elements, new_capacity * sizeof(type_t), 4);
+			*((int*)&array.capacity)   = new_capacity;
+			*((void**)&array.elements) =
+				membuf_resize(array.membuffer, array.elements, new_capacity * sizeof(type_t), 4);
 			return array.elements != NULL;
 		}
 		else

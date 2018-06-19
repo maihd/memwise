@@ -25,31 +25,35 @@ typedef struct
 } membuf_t;
 
 #ifndef __cplusplus
-#define membuf_clear(buf)                (buf)->clear((buf)->data)
-#define membuf_resize(buf, ptr, s, a)    (buf)->resize((buf)->data, ptr, s, a)
-#define membuf_collect(buf, ptr)         (buf)->collect((buf)->data, ptr)
-#define membuf_extract(buf, size, align) (buf)->extract((buf)->data, size, align)
-#else
-inline void membuf_clear(membuf_t* buf)
+#  if __GNUC__
+#    define inline __inline__
+#  elif defined(_MSC_VER)
+#    define inline __inline
+#  else
+#    define inline
+#  endif
+#endif 
+
+static inline void membuf_clear(membuf_t* buf)
 {
     buf->clear(buf->data);
 }
 
-inline void* membuf_resize(membuf_t* buf, void* ptr, int size, int align)
+static inline void* membuf_resize(membuf_t* buf, void* ptr, int size, int align)
 {
     return buf->resize(buf->data, ptr, size, align);
 }
 
-inline void membuf_collect(membuf_t* buf, void* ptr)
+static inline void membuf_collect(membuf_t* buf, void* ptr)
 {
     buf->collect(buf->data, ptr);
 }
 
-inline void* membuf_extract(membuf_t* buf, int size, int align)
+static inline void* membuf_extract(membuf_t* buf, int size, int align)
 {
     return buf->extract(buf->data, size, align);
 }
-#endif
+
 /* END OF HAS_MEMBUF_T */
 #endif
 
