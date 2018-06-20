@@ -320,7 +320,7 @@ namespace array
 		}
 		else
 		{
-			*((int*)&array.count) = array.count--;
+			*((int*)&array.count) = array.count - 1;
 		
 			if (index < array.count)
 			{
