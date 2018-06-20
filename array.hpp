@@ -139,6 +139,24 @@ public: /* @region: Operators */
 
 namespace array
 {
+	template <typename type_t>
+	inline int count(const array_t<type_t>& array)
+	{
+		return array.count;
+	}
+
+	template <typename type_t>
+	inline int capacity(const array_t<type_t>& array)
+	{
+		return array.capacity;
+	}
+
+	template <typename type_t>
+	inline const type_t* elements(const array_t<type_t>& array)
+	{
+		return array.elements;
+	}
+
     template <typename type_t>
     inline bool expand(array_t<type_t>& array, int capacity)
     {

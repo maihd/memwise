@@ -161,6 +161,30 @@ public: /* Constructors */
 namespace table
 {
     template <typename key_t, typename value_t>
+    inline int count(const table_t<key_t, value_t>& table)
+    {
+        return table.count;
+    }
+
+    template <typename key_t, typename value_t>
+    inline int capacity(const table_t<key_t, value_t>& table)
+    {
+        return table.capacity;
+    }
+    
+    template <typename key_t, typename value_t>
+    inline const key_t* keys(const table_t<key_t, value_t>& table)
+    {
+        return table.keys;
+    }
+    
+    template <typename key_t, typename value_t>
+    inline const value_t* values(const table_t<key_t, value_t>& table)
+    {
+        return table.values;
+    }
+
+    template <typename key_t, typename value_t>
     int find(const table_t<key_t, value_t>& table, const key_t& key, int* out_hash = NULL, int* out_prev = NULL)
     {
         int hash = hash_f<key_t>(key) % table.buckets;

@@ -122,6 +122,18 @@ namespace queue
     }
 
     template <typename type_t>
+    inline int capacity(const queue_t<type_t>& queue)
+    {
+        return queue.capacity;
+    }
+
+    template <typename type_t>
+    inline const type_t* elements(const queue_t<type_t>& queue)
+    {
+        return queue.elements;
+    }
+
+    template <typename type_t>
     inline const type_t& peek(const queue_t<type_t>& queue)
     {
         assert(queue::count(queue) > 0);
