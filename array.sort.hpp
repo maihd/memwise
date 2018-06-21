@@ -7,16 +7,29 @@
 namespace array
 {
     template <typename type_t>
-    void sort(array_t<type_t>& array)
+    inline void sort(array_t<type_t>& array)
     {
         ::sort::quick(array, array.count);
     }
 
     template <typename type_t>
-    void sort(array_t<type_t>& array, int start, int end)
+    inline void sort(array_t<type_t>& array, int start, int end)
     {
-        assert(start > -1 && start < end);
+        assert(start > -1 && start < end && end <= array.count);
         ::sort::quick(array.elements + start, end - start);
+    }
+
+    template <typename type_t, typename func_t>
+    inline void sort(array_t<type_t>& array, const func_t& compare)
+    {
+        ::sort::quick(array, array.count, compare);
+    }
+
+    template <typename type_t, typename func_t>
+    inline void sort(array_t<type_t>& array, int start, int end, const func_t& compare)
+    {
+        assert(start > -1 && start < end && end <= array.count);
+        ::sort::quick(array.elements + start, end - start, compare);
     }
 }
 
