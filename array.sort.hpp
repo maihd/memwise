@@ -4,6 +4,45 @@
 #include "sort.hpp"
 #include "array.hpp"
 
+namespace sort
+{
+    template <typename type_t>
+    inline void insert(array_t<type_t>& array)
+    {
+        insert(array, array.count);
+    }
+
+    template <typename type_t, typename func_t>
+    inline void insert(array_t<type_t>& array, const func_t& compare)
+    {
+        insert(array, array.count, compare);
+    }
+
+    template <typename type_t>
+    inline void quick(array_t<type_t>& array)
+    {
+        quick(array, array.count);
+    }
+
+    template <typename type_t, typename func_t>
+    inline void quick(array_t<type_t>& array, const func_t& compare)
+    {
+        quick(array, array.count, compare);
+    }
+    
+    template <typename type_t>
+    inline void shell(array_t<type_t>& array)
+    {
+        shell(array, array.count);
+    }
+
+    template <typename type_t, typename func_t>
+    inline void shell(array_t<type_t>& array, const func_t& compare)
+    {
+        shell(array, array.count, compare);
+    }
+}
+
 namespace array
 {
     template <typename type_t>
