@@ -157,6 +157,12 @@ namespace array
 		return array.elements;
 	}
 
+	template <typename type_t>
+	inline void clear(array_t<type_t>& array)
+	{
+		*((int*)&array.count) = 0;
+	}
+
     template <typename type_t>
     inline bool expand(array_t<type_t>& array, int capacity)
     {
