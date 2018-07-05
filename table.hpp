@@ -57,32 +57,6 @@ static inline void* membuf_extract(membuf_t* buf, int size, int align)
 /* END OF HAS_MEMBUF_T */
 #endif
 
-template <typename type_t>
-inline int hash_f(type_t value)
-{
-    union 
-    {
-        int    i;
-        type_t v;
-    } cvt;
-
-    cvt.v = value;
-    return cvt.i;
-}
-
-template <> 
-inline int hash_f(const char* str)
-{
-    int c;
-    int res = 0;
-    while ((c = *str++))
-    {
-        res ^= c;
-        res |= c;
-    }
-    return res;
-}
-
 template <typename key_t, typename value_t>
 union table_t
 {
@@ -160,6 +134,38 @@ public: /* Constructors */
 
 namespace table
 {
+    template <typename type_t>
+    inline bool equal_f(type_t a, type_t b)
+    {
+        return a == b;
+    }
+
+    template <typename type_t>
+    inline int hash_f(type_t value)
+    {
+        union 
+        {
+            int    i;
+            type_t v;
+        } cvt;
+
+        cvt.v = value;
+        return cvt.i;
+    }
+
+    template <> 
+    inline int hash_f(const char* str)
+    {
+        int c;
+        int res = 0;
+        while ((c = *str++))
+        {
+            res ^= c;
+            res |= c;
+        }
+        return res;
+    }
+
     template <typename key_t, typename value_t>
     inline int count(const table_t<key_t, value_t>& table)
     {
@@ -193,7 +199,7 @@ namespace table
 
         while (curr > -1)
         {
-            if (table.keys[curr] == key)
+            if (equal_f(table.keys[curr], key))
             {
                 break;
             }
